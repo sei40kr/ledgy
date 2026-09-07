@@ -1,0 +1,208 @@
+rules_version = '2';
+
+// There is no backend, so these rules are the only server-side line of defense.
+//
+// Assumption: tenantId equals the uid of whoever created the tenant. In the MVP
+// one user owns exactly one tenant. The sign-up writeBatch (tenant + member +
+// standard accountTitles) runs before the member doc exists; the first clause of
+// isOwner() is what lets it through.
+//
+// Limits of the rules language (also spelled out in the README):
+// - without loops, postings[].amount cannot be validated element by element
+// - the posting-level sums cannot be reconciled against the header totals
+//   (debitTotal / creditTotal)
+// Domain-layer validation and the rebuildMonthlyTransactionSummaries usecase cover both.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /tenants/{tenantId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+      // The tenant's creator. This is what makes the sign-up bootstrap possible.
+      function isOwner() {
+        return isSignedIn() && request.auth.uid == tenantId;
+      }
+      function memberRole() {
+        return get(/databases/$(database)/documents/tenants/$(tenantId)/members/$(request.auth.uid))
+                 .data.role;
+      }
+      // Checking owner first keeps get() off the hot path. A revoked member's
+      // doc survives (nothing is hard-deleted) but grants nothing.
+      function isMember() {
+        return isOwner()
+          || (isSignedIn() && memberRole() in ['admin', 'editor', 'viewer']);
+      }
+      // A viewer is read-only.
+      function canWrite() {
+        return isOwner()
+          || (isSignedIn() && memberRole() in ['admin', 'editor']);
+      }
+      function validAccountTitle(d) {
+        return d.name is string && d.name.size() > 0
+          && d.category in ['asset', 'liability', 'equity', 'revenue', 'expense']
+          && d.isActive is bool
+          && d.searchWords is list
+          && d.sortOrder is int;
+      }
+      function validFiscalYear(d) {
+        return d.startDate is timestamp && d.endDate is timestamp
+          && d.startDate < d.endDate
+          && d.status in ['open', 'closed'];
+      }
+
+      allow read: if isMember();
+      allow create: if isOwner();
+      allow update: if canWrite();
+      // Hard deletes are forbidden in every collection, here and below.
+      allow delete: if false;
+
+      match /members/{memberId} {
+        allow read: if isMember();
+        // 'revoked' is how access is taken away, since the doc can never be deleted.
+        allow create, update: if isOwner()
+          && request.resource.data.role in ['admin', 'editor', 'viewer', 'revoked'];
+        allow delete: if false;
+      }
+
+      match /accountTitles/{accountTitleId} {
+        allow read: if isMember();
+        allow create, update: if canWrite() && validAccountTitle(request.resource.data);
+        allow delete: if false;
+
+        match /subAccountTitles/{subAccountTitleId} {
+          allow read: if isMember();
+          allow create, update: if canWrite()
+            && request.resource.data.name is string
+            && request.resource.data.name.size() > 0
+            && request.resource.data.isActive is bool
+            && request.resource.data.searchWords is list;
+          allow delete: if false;
+        }
+      }
+
+      match /partners/{partnerId} {
+        allow read: if isMember();
+        allow create, update: if canWrite()
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.searchWords is list;
+        allow delete: if false;
+      }
+
+      match /tags/{tagId} {
+        allow read: if isMember();
+        allow create, update: if canWrite()
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.searchWords is list;
+        allow delete: if false;
+      }
+
+      match /fiscalYears/{yearId} {
+        function year() {
+          return get(/databases/$(database)/documents/tenants/$(tenantId)/fiscalYears/$(yearId)).data;
+        }
+        // Everything under a year is writable only while it is open, which
+        // freezes closed years.
+        function yearIsOpen() {
+          return year().status == 'open';
+        }
+        function withinYear(date) {
+          return date >= year().startDate && date <= year().endDate;
+        }
+
+        allow read: if isMember();
+        allow create: if canWrite() && validFiscalYear(request.resource.data);
+        // An editor may close a year; only the owner may touch a closed one,
+        // reopening included.
+        allow update: if canWrite() && validFiscalYear(request.resource.data)
+          && (resource.data.status == 'open' || isOwner());
+        allow delete: if false;
+
+        match /transactions/{transactionId} {
+          function transactionPath() {
+            return /databases/$(database)/documents/tenants/$(tenantId)/fiscalYears/$(yearId)/transactions/$(transactionId);
+          }
+          function revisionPath(revisionId) {
+            return /databases/$(database)/documents/tenants/$(tenantId)/fiscalYears/$(yearId)/transactions/$(transactionId)/revisions/$(revisionId);
+          }
+          // The content of one version, carried by the header and by every revision.
+          function validContent(d) {
+            return d.date is timestamp && withinYear(d.date)
+              && d.description is string
+              && d.partners is list
+              && d.tags is list
+              && d.postings is list
+              && d.postings.size() > 0
+              && d.postings.size() <= 50
+              && d.deleted is bool
+              && (d.get('system', null) == null || d.system is string);
+          }
+          // The header must link to a revision that this very request appends,
+          // and carry exactly that revision's content. A header change without a
+          // history entry, or a re-point at an older version, is therefore
+          // impossible; the revision's author and time are pinned by its own rule.
+          function mirrorsNewRevision(d) {
+            return d.currentRevision is string
+              && !exists(revisionPath(d.currentRevision))
+              && existsAfter(revisionPath(d.currentRevision))
+              && getAfter(revisionPath(d.currentRevision)).data.date == d.date
+              && getAfter(revisionPath(d.currentRevision)).data.description == d.description
+              && getAfter(revisionPath(d.currentRevision)).data.partners == d.partners
+              && getAfter(revisionPath(d.currentRevision)).data.tags == d.tags
+              && getAfter(revisionPath(d.currentRevision)).data.postings == d.postings
+              && getAfter(revisionPath(d.currentRevision)).data.deleted == d.deleted
+              && getAfter(revisionPath(d.currentRevision)).data.get('system', null) == d.get('system', null);
+          }
+          function validHeader(d) {
+            return validContent(d)
+              && d.debitTotal is int && d.creditTotal is int
+              // Server-side check that the header debit and credit totals match.
+              && d.debitTotal > 0
+              && d.debitTotal == d.creditTotal
+              && d.createdBy is string
+              // Record the caller and the server time as the latest change.
+              && d.updatedBy == request.auth.uid
+              && d.updatedAt == request.time
+              && mirrorsNewRevision(d);
+          }
+
+          allow read: if isMember();
+          allow create: if canWrite() && yearIsOpen()
+            && validHeader(request.resource.data)
+            && request.resource.data.createdBy == request.auth.uid
+            && request.resource.data.createdAt == request.time
+            && request.resource.data.deleted == false;
+          allow update: if canWrite() && yearIsOpen()
+            && validHeader(request.resource.data)
+            // Pin the original author and creation time.
+            && request.resource.data.createdBy == resource.data.createdBy
+            && request.resource.data.createdAt == resource.data.createdAt;
+          allow delete: if false;
+
+          // The transaction's version history: one doc per version, holding the
+          // full content as of that version, ordered by createdAt. Create-only, so
+          // history can neither be rewritten nor erased. Every entry names its real
+          // author and time, is written while the year is open, and is the version
+          // the header links to once the request commits, so no stray entries.
+          match /revisions/{revisionId} {
+            allow read: if isMember();
+            allow create: if canWrite() && yearIsOpen()
+              && validContent(request.resource.data)
+              && request.resource.data.createdBy == request.auth.uid
+              && request.resource.data.createdAt == request.time
+              && getAfter(transactionPath()).data.currentRevision == revisionId;
+            allow update: if false;
+            allow delete: if false;
+          }
+        }
+
+        match /monthlyTransactionSummaries/{monthKey} {
+          allow read: if isMember();
+          allow create, update: if canWrite() && yearIsOpen();
+          allow delete: if false;
+        }
+      }
+    }
+  }
+}

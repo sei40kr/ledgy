@@ -10,14 +10,18 @@
     "node": ">=20"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit -p packages/domain && tsc --noEmit -p packages/usecases && tsc --noEmit -p packages/infrastructure",
+    "emulators": "firebase emulators:start --project demo-account-ledgers",
+    "typecheck": "tsc --noEmit -p packages/domain && tsc --noEmit -p packages/usecases && tsc --noEmit -p packages/infrastructure && tsc --noEmit -p packages/web",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "test:unit": "vitest run --project domain-unit --project usecases-unit --passWithNoTests"
+    "test:unit": "vitest run --project domain-unit --project usecases-unit --passWithNoTests",
+    "test:integration": "firebase emulators:exec --only auth,firestore --project demo-account-ledgers \"vitest run --project rules --passWithNoTests\""
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
     "@storybook/addon-docs": "^10.6.0",
     "@storybook/nextjs-vite": "^10.6.0",
+    "firebase-tools": "^14.9.0",
     "storybook": "^10.6.0",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"
