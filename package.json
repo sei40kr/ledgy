@@ -10,6 +10,8 @@
     "node": ">=20"
   },
   "scripts": {
+    "dev": "firebase emulators:exec --project demo-account-ledgers --only auth,firestore,storage --ui \"npm run seed && cd packages/web && next dev\"",
+    "build": "cd packages/web && next build",
     "emulators": "firebase emulators:start --project demo-account-ledgers",
     "seed": "tsx --tsconfig scripts/tsconfig.json scripts/seed.ts",
     "lint": "eslint .",

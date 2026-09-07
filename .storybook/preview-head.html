@@ -1,0 +1,17 @@
+<!--
+  The app loads Inter and Noto Sans JP through next/font and exposes them as CSS
+  variables (see app/layout.tsx). Storybook loads the same faces from Google
+  Fonts and defines the same variables so the theme's font tokens resolve.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;600;700&display=swap"
+  rel="stylesheet"
+/>
+<style>
+  :root {
+    --font-inter: "Inter";
+    --font-noto-jp: "Noto Sans JP";
+  }
+</style>

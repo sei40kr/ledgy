@@ -32,6 +32,10 @@ export default tseslint.config(
           type: "infrastructure",
           pattern: "packages/infrastructure/**",
         },
+        {
+          type: "presentation",
+          pattern: "packages/web/src/(app|components|hooks)/**",
+        },
         { type: "web-tests", pattern: "packages/web/tests/**" },
         { type: "scripts", pattern: "scripts/**" },
       ],
@@ -58,6 +62,16 @@ export default tseslint.config(
             {
               from: "infrastructure",
               allow: ["infrastructure", "application", "domain"],
+            },
+            {
+              from: "presentation",
+              allow: [
+                "presentation",
+                "application",
+                "domain",
+                // Intended only for the composition root, which injects the repository implementations.
+                "infrastructure",
+              ],
             },
             {
               from: "web-tests",
