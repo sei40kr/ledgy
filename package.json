@@ -10,13 +10,16 @@
     "node": ">=20"
   },
   "scripts": {
+    "typecheck": "tsc --noEmit -p packages/domain",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "build-storybook": "storybook build",
+    "test:unit": "vitest run --project domain-unit --passWithNoTests"
   },
   "devDependencies": {
     "@storybook/addon-docs": "^10.6.0",
     "@storybook/nextjs-vite": "^10.6.0",
     "storybook": "^10.6.0",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
   }
 }
