@@ -11,11 +11,13 @@
   },
   "scripts": {
     "emulators": "firebase emulators:start --project demo-account-ledgers",
+    "seed": "tsx --tsconfig scripts/tsconfig.json scripts/seed.ts",
     "typecheck": "tsc --noEmit -p packages/domain && tsc --noEmit -p packages/usecases && tsc --noEmit -p packages/infrastructure && tsc --noEmit -p packages/web",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
+    "test": "npm run test:unit && npm run test:integration",
     "test:unit": "vitest run --project domain-unit --project usecases-unit --passWithNoTests",
-    "test:integration": "firebase emulators:exec --only auth,firestore --project demo-account-ledgers \"vitest run --project rules --passWithNoTests\""
+    "test:integration": "firebase emulators:exec --only auth,firestore --project demo-account-ledgers \"vitest run --project integration --project rules --passWithNoTests\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^4.0.1",
@@ -23,6 +25,7 @@
     "@storybook/nextjs-vite": "^10.6.0",
     "firebase-tools": "^14.9.0",
     "storybook": "^10.6.0",
+    "tsx": "^4.20.0",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"
   }
