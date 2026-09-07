@@ -1,0 +1,22 @@
+{
+  "name": "account-ledgers",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Double-entry bookkeeping app for Japanese sole proprietors and small companies (MVP)",
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
+  },
+  "devDependencies": {
+    "@storybook/addon-docs": "^10.6.0",
+    "@storybook/nextjs-vite": "^10.6.0",
+    "storybook": "^10.6.0",
+    "typescript": "^5.8.3"
+  }
+}
