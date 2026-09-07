@@ -1,0 +1,13 @@
+{
+  "name": "@account-ledgers/usecases",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@account-ledgers/domain": "*"
+  }
+}

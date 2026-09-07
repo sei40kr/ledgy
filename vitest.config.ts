@@ -12,6 +12,13 @@ export default defineConfig({
           include: ["packages/domain/src/**/*.test.ts"],
         },
       },
+      {
+        test: {
+          name: "usecases-unit",
+          environment: "node",
+          include: ["packages/usecases/src/**/*.test.ts"],
+        },
+      },
     ],
   },
 });
