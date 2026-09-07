@@ -10,7 +10,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit -p packages/domain && tsc --noEmit -p packages/usecases",
+    "typecheck": "tsc --noEmit -p packages/domain && tsc --noEmit -p packages/usecases && tsc --noEmit -p packages/infrastructure",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "test:unit": "vitest run --project domain-unit --project usecases-unit --passWithNoTests"

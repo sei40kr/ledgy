@@ -1,0 +1,14 @@
+{
+  "name": "@account-ledgers/infrastructure",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "dependencies": {
+    "@account-ledgers/domain": "*",
+    "@account-ledgers/usecases": "*",
+    "firebase": "^11.10.0"
+  }
+}
