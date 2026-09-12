@@ -2,6 +2,7 @@ import type {
   Transaction,
   Posting,
   PartnerId,
+  SupportingDocumentId,
   TagId,
   TransactionRevision,
   TenantId,
@@ -12,7 +13,11 @@ import type {
 } from "@account-ledgers/domain";
 import type { OpeningBalance } from "../fiscalYears/openingBalance";
 
-/** Input for a transaction. The repository owns the header totals and the revision history. */
+/**
+ * Input for a transaction: the content the user enters. The repository owns the
+ * header totals and the revision history; the attached supporting documents are managed by
+ * attachSupportingDocument / detachSupportingDocument (and given once, on create).
+ */
 export interface TransactionDraft {
   /** Calendar date normalized to UTC midnight. */
   date: Date;
@@ -46,19 +51,22 @@ export interface TransactionRepository {
    * Creates a transaction, doing all of the following atomically in a runTransaction:
    * validate that it balances (domain) → write the transaction with its current content
    * and header totals denormalized → record the first version in its revisions
-   * subcollection → apply the delta to that month's monthlyTransactionSummaries.
+   * subcollection → apply the delta to that month's monthlyTransactionSummaries →
+   * mark each of `supportingDocumentIds` (which must be unattached) as attached to it.
    */
   create(input: {
     tenantId: TenantId;
     yearId: FiscalYearId;
     draft: TransactionDraft;
+    supportingDocumentIds: SupportingDocumentId[];
     createdBy: UserId;
   }): Promise<{ transactionId: TransactionId }>;
 
   /**
-   * Updates a transaction. Atomically records the new version's full content in
-   * the revisions subcollection, subtracts the old postings from the summaries, and
-   * adds the new ones, handling a transaction that moves across months. Rejects a
+   * Updates a transaction's content, keeping its attached supporting documents as they are.
+   * Atomically records the new version's full content in the revisions
+   * subcollection, subtracts the old postings from the summaries, and adds the
+   * new ones, handling a transaction that moves across months. Rejects a
    * missing transaction (TransactionNotFoundError) and a soft-deleted one
    * (TransactionDeletedError).
    */
@@ -72,14 +80,41 @@ export interface TransactionRepository {
 
   /**
    * Soft-deletes a transaction by setting deleted: true; there is no hard delete.
-   * Records the deleted version as a revision and subtracts from the summaries atomically.
-   * Rejects a missing transaction (TransactionNotFoundError) and one that is
-   * already deleted (TransactionDeletedError).
+   * Records the deleted version as a revision, subtracts from the summaries, and
+   * releases its supporting documents (they stay listed in the deleted version's history but
+   * become unattached again), all atomically. Rejects a missing transaction
+   * (TransactionNotFoundError) and one that is already deleted
+   * (TransactionDeletedError).
    */
   softDelete(input: {
     tenantId: TenantId;
     yearId: FiscalYearId;
     transactionId: TransactionId;
+    updatedBy: UserId;
+  }): Promise<void>;
+
+  /**
+   * Attaches an unattached supporting document to a live transaction: appends a revision
+   * whose content differs only in supportingDocumentIds, updates the header, and marks the
+   * supporting document as attached, atomically.
+   */
+  attachSupportingDocument(input: {
+    tenantId: TenantId;
+    yearId: FiscalYearId;
+    transactionId: TransactionId;
+    supportingDocumentId: SupportingDocumentId;
+    updatedBy: UserId;
+  }): Promise<void>;
+
+  /**
+   * The reverse of attachSupportingDocument, run by deleteSupportingDocument before the soft delete:
+   * the supporting document becomes unattached again, and the change is versioned.
+   */
+  detachSupportingDocument(input: {
+    tenantId: TenantId;
+    yearId: FiscalYearId;
+    transactionId: TransactionId;
+    supportingDocumentId: SupportingDocumentId;
     updatedBy: UserId;
   }): Promise<void>;
 

@@ -75,3 +75,31 @@ resource "google_identity_platform_config" "default" {
 
   depends_on = [google_project_service.services]
 }
+
+# Supporting document files (証憑). One bucket, in the same region as Firestore. Object
+# versioning keeps every version of an object even though the Storage rules
+# never allow an overwrite or a delete, as a second line of defense for the
+# retention the 電子帳簿保存法 requires. Access is governed by storage.rules,
+# deployed with `firebase deploy` like the Firestore rules.
+resource "google_storage_bucket" "supportingDocuments" {
+  project  = var.project_id
+  name     = "${var.project_id}-supportingDocuments"
+  location = var.region
+
+  uniform_bucket_level_access = true
+  public_access_prevention    = "enforced"
+
+  versioning {
+    enabled = true
+  }
+
+  depends_on = [google_project_service.services]
+}
+
+resource "google_firebase_storage_bucket" "supportingDocuments" {
+  provider  = google-beta
+  project   = var.project_id
+  bucket_id = google_storage_bucket.supportingDocuments.id
+
+  depends_on = [google_firebase_project.default]
+}

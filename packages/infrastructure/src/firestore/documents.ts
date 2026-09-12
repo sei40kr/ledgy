@@ -39,6 +39,24 @@ export interface TagDocument {
   updatedAt: Timestamp;
 }
 
+/**
+ * A supporting document's record. The file itself is the Cloud Storage object at
+ * `tenants/{tenantId}/supportingDocuments/{supportingDocumentId}`. transactionId / fiscalYearId are the
+ * attachment link, both null while unattached; transactionId is what the
+ * "supporting documents of this transaction" query filters on.
+ */
+export interface SupportingDocumentDocument {
+  fileName: string;
+  contentType: string;
+  size: number;
+  uploadedBy: string;
+  uploadedAt: Timestamp;
+  transactionId: string | null;
+  fiscalYearId: string | null;
+  deleted: boolean;
+  updatedAt: Timestamp;
+}
+
 export interface FiscalYearDocument {
   startDate: Timestamp;
   endDate: Timestamp;
@@ -72,6 +90,7 @@ export interface TransactionDocument {
   partners: string[];
   tags: string[];
   postings: PostingDocument[];
+  supportingDocumentIds: string[];
   deleted: boolean;
   system: string | null;
   accountTitleIds: string[];
@@ -87,6 +106,7 @@ export interface TransactionRevisionDocument {
   partners: string[];
   tags: string[];
   postings: PostingDocument[];
+  supportingDocumentIds: string[];
   deleted: boolean;
   system: string | null;
 }

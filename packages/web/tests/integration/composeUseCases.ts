@@ -3,6 +3,7 @@
 import type { AccountTitleRepository } from "@account-ledgers/usecases";
 import type { FiscalYearRepository } from "@account-ledgers/usecases";
 import type { MonthlyTransactionSummaryRepository } from "@account-ledgers/usecases";
+import type { SupportingDocumentRepository } from "@account-ledgers/usecases";
 import type { TransactionRepository } from "@account-ledgers/usecases";
 import { createAccountTitleUseCase } from "@account-ledgers/usecases";
 import { createSubAccountTitleUseCase } from "@account-ledgers/usecases";
@@ -18,10 +19,16 @@ import { listFiscalYearsUseCase } from "@account-ledgers/usecases";
 import { saveOpeningBalanceUseCase } from "@account-ledgers/usecases";
 import { setFiscalYearStatusUseCase } from "@account-ledgers/usecases";
 import { getAccountLedgerUseCase } from "@account-ledgers/usecases";
+import { attachSupportingDocumentToTransactionUseCase } from "@account-ledgers/usecases";
 import { createTransactionUseCase } from "@account-ledgers/usecases";
 import { searchTransactionsUseCase } from "@account-ledgers/usecases";
 import { softDeleteTransactionUseCase } from "@account-ledgers/usecases";
 import { updateTransactionUseCase } from "@account-ledgers/usecases";
+import { deleteSupportingDocumentUseCase } from "@account-ledgers/usecases";
+import { getSupportingDocumentUseCase } from "@account-ledgers/usecases";
+import { getSupportingDocumentFileUrlUseCase } from "@account-ledgers/usecases";
+import { listSupportingDocumentsUseCase } from "@account-ledgers/usecases";
+import { uploadSupportingDocumentUseCase } from "@account-ledgers/usecases";
 import { getTrialBalanceUseCase } from "@account-ledgers/usecases";
 import { rebuildMonthlyTransactionSummariesUseCase } from "@account-ledgers/usecases";
 
@@ -61,7 +68,22 @@ export function createTransactionUseCases(deps: {
     create: createTransactionUseCase(deps),
     update: updateTransactionUseCase(deps),
     softDelete: softDeleteTransactionUseCase(deps),
+    attachSupportingDocument: attachSupportingDocumentToTransactionUseCase(deps),
     search: searchTransactionsUseCase({ transactions: deps.transactions }),
+  };
+}
+
+export function createSupportingDocumentUseCases(deps: {
+  supportingDocuments: SupportingDocumentRepository;
+  transactions: TransactionRepository;
+  fiscalYears: FiscalYearRepository;
+}) {
+  return {
+    list: listSupportingDocumentsUseCase(deps),
+    get: getSupportingDocumentUseCase(deps),
+    getFileUrl: getSupportingDocumentFileUrlUseCase(deps),
+    upload: uploadSupportingDocumentUseCase(deps),
+    delete: deleteSupportingDocumentUseCase(deps),
   };
 }
 

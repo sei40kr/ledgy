@@ -1,8 +1,46 @@
 rules_version = '2';
 
-// The MVP does not use Storage, so deny everything.
+// Supporting document files (証憑) only. The record for each file is the Firestore doc at
+// the same path, and membership is looked up there. An object is written once
+// and never overwritten or deleted: removing a supporting document is a soft delete of its
+// record, and a corrected scan is a new supporting document.
 service firebase.storage {
   match /b/{bucket}/o {
+    match /tenants/{tenantId}/supportingDocuments/{supportingDocumentId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+      // The tenant's creator (tenantId equals their uid).
+      function isOwner() {
+        return isSignedIn() && request.auth.uid == tenantId;
+      }
+      function memberRole() {
+        return firestore.get(/databases/(default)/documents/tenants/$(tenantId)/members/$(request.auth.uid))
+                 .data.role;
+      }
+      function isMember() {
+        return isOwner()
+          || (isSignedIn() && memberRole() in ['admin', 'editor', 'viewer']);
+      }
+      function canWrite() {
+        return isOwner()
+          || (isSignedIn() && memberRole() in ['admin', 'editor']);
+      }
+
+      allow read: if isMember();
+      // Keep the accepted types and the size limit in sync with firestore.rules
+      // and validateSupportingDocumentFile in the domain. `resource == null` makes the
+      // write-once guarantee explicit: production classifies an upload over an
+      // existing object as an update, the emulator as a create, and this holds
+      // in both.
+      allow create: if resource == null
+        && canWrite()
+        && request.resource.contentType in ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
+        && request.resource.size > 0
+        && request.resource.size <= 20 * 1024 * 1024;
+      allow update, delete: if false;
+    }
+
     match /{allPaths=**} {
       allow read, write: if false;
     }

@@ -2,8 +2,11 @@
 
 import {
   type AccountTitleId,
+  type FiscalYearId,
   type Posting,
+  type TenantId,
   type Transaction,
+  type UserId,
 } from "@account-ledgers/domain";
 import {
   Alert,
@@ -25,7 +28,10 @@ import { AccountTitleBadge } from "@/components/AccountTitleBadge";
 import { AppShell } from "@/components/AppShell";
 import { DateField } from "@/components/DateField";
 import { MonetaryAmountText } from "@/components/MonetaryAmountText";
+import { FileIcon } from "@/components/FileIcon";
 import { TableCard } from "@/components/TableCard";
+import { TransactionSupportingDocumentsDialog } from "@/components/TransactionSupportingDocumentsDialog";
+import { useTransactionSupportingDocuments } from "@/hooks/useTransactionSupportingDocuments";
 import { TAX_CATEGORY_LABELS } from "@/components/labels";
 import {
   formatDate,
@@ -51,7 +57,7 @@ export default function TransactionsPage() {
 }
 
 function TransactionsContent() {
-  const { tenantId } = useAuth();
+  const { tenantId, user } = useAuth();
   const { currentYear } = useFiscalYears();
   const { accountTitles } = useAccountTitles();
   const { partners } = usePartners();
@@ -68,6 +74,8 @@ function TransactionsContent() {
   const [nextCursor, setNextCursor] = useState<unknown | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The transaction whose supporting documents are open in the dialog.
+  const [supportingDocumentsOf, setSupportingDocumentsOf] = useState<Transaction | null>(null);
 
   const accountById = useMemo(
     () => new Map(accountTitles.map((a) => [a.id, a])),
@@ -144,6 +152,18 @@ function TransactionsContent() {
   useEffect(() => {
     void runSearch();
   }, [runSearch]);
+
+  // After the dialog attaches or detaches, refresh the header the indicator reads.
+  const refreshTransaction = useCallback(async () => {
+    if (!tenantId || !currentYear || !supportingDocumentsOf) return;
+    const fresh = await usecases.transactions.get({
+      tenantId,
+      yearId: currentYear.id,
+      transactionId: supportingDocumentsOf.id,
+    });
+    if (!fresh) return;
+    setTransactions((prev) => prev.map((t) => (t.id === fresh.id ? fresh : t)));
+  }, [tenantId, currentYear, supportingDocumentsOf]);
 
   if (!currentYear) {
     return (
@@ -238,6 +258,9 @@ function TransactionsContent() {
               貸方金額
             </Table.ColumnHeader>
             <Table.ColumnHeader>摘要 / 取引先</Table.ColumnHeader>
+            <Table.ColumnHeader w="4.5rem" textAlign="center">
+              証憑
+            </Table.ColumnHeader>
             <Table.ColumnHeader w="5rem">状態</Table.ColumnHeader>
           </Table.Row>
         </Table.Header>
@@ -298,6 +321,14 @@ function TransactionsContent() {
                       </Text>
                     )}
                   </Table.Cell>
+                  <Table.Cell textAlign="center">
+                    {i === 0 && (
+                      <SupportingDocumentIndicator
+                        count={rev.supportingDocumentIds.length}
+                        onClick={() => setSupportingDocumentsOf(transaction)}
+                      />
+                    )}
+                  </Table.Cell>
                   <Table.Cell>
                     {i === 0 &&
                       (deleted ? (
@@ -331,7 +362,94 @@ function TransactionsContent() {
           さらに読み込む
         </Button>
       )}
+
+      {supportingDocumentsOf && tenantId && user && (
+        <JournalSupportingDocumentsDialog
+          tenantId={tenantId}
+          yearId={currentYear.id}
+          userId={user.uid as UserId}
+          transaction={supportingDocumentsOf}
+          disabled={currentYear.status !== "open" || supportingDocumentsOf.deleted}
+          onChanged={() => void refreshTransaction()}
+          onClose={() => setSupportingDocumentsOf(null)}
+        />
+      )}
     </Stack>
+  );
+}
+
+/**
+ * The documents of one journal row, with every action applied immediately.
+ * onChanged lets the journal refresh the row's indicator.
+ */
+function JournalSupportingDocumentsDialog({
+  tenantId,
+  yearId,
+  userId,
+  transaction,
+  disabled,
+  onChanged,
+  onClose,
+}: {
+  tenantId: TenantId;
+  yearId: FiscalYearId;
+  userId: UserId;
+  transaction: Transaction;
+  disabled: boolean;
+  onChanged(): void;
+  onClose(): void;
+}) {
+  const { supportingDocuments, attach, remove } = useTransactionSupportingDocuments({
+    tenantId,
+    yearId,
+    transactionId: transaction.id,
+    userId,
+  });
+  const changed = <T,>(action: (input: T) => Promise<void>) => async (input: T) => {
+    await action(input);
+    onChanged();
+  };
+  return (
+    <TransactionSupportingDocumentsDialog
+      description={transaction.description}
+      tenantId={tenantId}
+      uploadedBy={userId}
+      supportingDocuments={supportingDocuments}
+      disabled={disabled}
+      onAttach={changed(attach)}
+      onDelete={changed(remove)}
+      onClose={onClose}
+    />
+  );
+}
+
+/**
+ * Whether a transaction has supporting documents, and how many, at a glance;
+ * clicking opens them. With none yet it reads as the action to add one, so it
+ * still looks clickable. Stops the click so the row does not navigate to the
+ * edit page.
+ */
+function SupportingDocumentIndicator({
+  count,
+  onClick,
+}: {
+  count: number;
+  onClick(): void;
+}) {
+  return (
+    <Button
+      size="2xs"
+      variant={count > 0 ? "subtle" : "outline"}
+      aria-label={count > 0 ? `証憑 ${count}件` : "証憑を追加"}
+      title={count > 0 ? `証憑 ${count}件` : "証憑を追加"}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+    >
+      <FileIcon boxSize="12px" />
+      {count > 0 ? count : "追加"}
+    </Button>
   );
 }
 

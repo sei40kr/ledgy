@@ -72,6 +72,7 @@ function content(overrides: Fields = {}): Fields {
         memo: "",
       },
     ],
+    supportingDocumentIds: [],
     deleted: false,
     system: null,
     ...overrides,
@@ -312,6 +313,15 @@ describe("Security Rules tying the header to its revision", () => {
     await assertFails(createVersion(db, { header: { postings: otherPostings } }));
     await assertFails(createVersion(db, { header: { date: new Date("2026-02-10") } }));
     await assertFails(createVersion(db, { header: { deleted: true } }));
+    // Which supporting documents are attached is versioned content too.
+    await assertFails(createVersion(db, { header: { supportingDocumentIds: ["r1"] } }));
+  });
+
+  it("rejects content without a supportingDocumentIds list", async () => {
+    const db = testEnv.authenticatedContext("alice").firestore();
+    await assertFails(
+      createVersion(db, { header: { supportingDocumentIds: "r1" }, revision: { supportingDocumentIds: "r1" } }),
+    );
   });
 
   it("rejects a header that links to a revision other than the one written", async () => {

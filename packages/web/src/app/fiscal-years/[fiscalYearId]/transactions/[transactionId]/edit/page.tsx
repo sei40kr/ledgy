@@ -1,7 +1,13 @@
 "use client";
 
-import type { TransactionId, UserId, Transaction } from "@account-ledgers/domain";
-import { Alert, Link, Spinner, Stack, Text } from "@chakra-ui/react";
+import type {
+  FiscalYearId,
+  TenantId,
+  TransactionId,
+  UserId,
+  Transaction,
+} from "@account-ledgers/domain";
+import { Alert, Box, Flex, Link, Spinner, Stack, Text } from "@chakra-ui/react";
 import NextLink from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -11,6 +17,8 @@ import {
   draftToFormValues,
   TransactionForm,
 } from "@/components/TransactionForm";
+import { SupportingDocumentsPane } from "@/components/SupportingDocumentsPane";
+import { useTransactionSupportingDocuments } from "@/hooks/useTransactionSupportingDocuments";
 import { useAccountTitles } from "@/hooks/useAccountTitles";
 import { useAuth } from "@/hooks/useAuth";
 import { useFiscalYears } from "@/hooks/useFiscalYears";
@@ -136,19 +144,60 @@ function EditTransactionContent() {
           <Alert.Title>この仕訳は削除済です</Alert.Title>
         </Alert.Root>
       )}
-      <TransactionForm
-        tenantId={tenantId}
-        accountTitles={accountTitles}
-        initialValues={draftToFormValues(transaction)}
-        mode="edit"
-        disabled={closed || transaction.deleted}
-        fiscalYear={currentYear}
-        submitLabel="更新"
-        resetAfterSubmit={false}
-        onSubmit={handleSubmit}
-        onDelete={handleDelete}
-        onCancel={() => router.push(journalHref)}
-      />
+      <Flex gap={4} align="flex-start">
+        <Box flex={1} minW={0}>
+          <TransactionForm
+            tenantId={tenantId}
+            accountTitles={accountTitles}
+            initialValues={draftToFormValues(transaction)}
+            mode="edit"
+            disabled={closed || transaction.deleted}
+            fiscalYear={currentYear}
+            submitLabel="更新"
+            resetAfterSubmit={false}
+            onSubmit={handleSubmit}
+            onDelete={handleDelete}
+            onCancel={() => router.push(journalHref)}
+          />
+        </Box>
+        {user && (
+          <EditTransactionSupportingDocuments
+            tenantId={tenantId}
+            yearId={currentYear.id}
+            transactionId={transaction.id}
+            userId={user.uid as UserId}
+            description={transaction.description}
+            disabled={closed || transaction.deleted}
+          />
+        )}
+      </Flex>
     </Stack>
+  );
+}
+
+/**
+ * The supporting documents of the transaction being edited. Unlike the postings, which
+ * commit on 更新, attaching and deleting apply immediately: each is its own
+ * version of the transaction.
+ */
+function EditTransactionSupportingDocuments(props: {
+  tenantId: TenantId;
+  yearId: FiscalYearId;
+  transactionId: TransactionId;
+  userId: UserId;
+  description: string;
+  disabled: boolean;
+}) {
+  const { supportingDocuments, attach, remove } = useTransactionSupportingDocuments(props);
+  return (
+    <SupportingDocumentsPane
+      description={props.description}
+      tenantId={props.tenantId}
+      uploadedBy={props.userId}
+      supportingDocuments={supportingDocuments}
+      disabled={props.disabled}
+      onAttach={attach}
+      onDelete={remove}
+    />
   );
 }

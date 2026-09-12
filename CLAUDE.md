@@ -12,7 +12,7 @@ Fully serverless with no backend code: a Next.js static export talking to Firest
 | `npm run seed` | Seeds demo data into already-running emulators. Idempotent; `npm run dev` runs it automatically. |
 | `npm test` | Every test: unit first, then integration, which runs inside `emulators:exec` |
 | `npm run test:unit` | The domain / application unit tests only — fast, no emulator |
-| `npm run test:integration` | Integration + Security Rules tests, starting the emulators automatically |
+| `npm run test:integration` | Integration + Security Rules tests (Firestore and Storage), starting the emulators automatically |
 | `npm run lint` | ESLint, including the layer-boundary check |
 | `npm run typecheck` | Type-checks every package |
 | `npm run storybook` | Starts Storybook on 6006 for the web components. The stories run against an in-memory mock of the composition root, never the emulators. |
@@ -36,12 +36,15 @@ Dependencies flow **presentation → application → domain** and nowhere else, 
 5. The content of a transaction lives in its revisions: the subcollection is append-only, each doc records the full content of one version, and the transaction doc links to the current one via currentRevision. The rules forbid update and delete on revisions, pin each revision's author and time to the caller and the server, and require every header write to mirror the content of a revision appended in the same request, which is what makes history tamper-proof.
 6. **Development and tests never connect to the production project.** The project ID is `demo-account-ledgers`; a `demo-` prefix is treated as emulator-only and cannot reach a real project.
 7. tenantId equals the creator's uid — in the MVP, one user owns one tenant. The Security Rules bootstrap depends on this assumption.
+8. **A supporting document (証憑) is one file, attached to a transaction rather than to a posting, and exists on its own.** Which supporting documents are attached is versioned content (`supportingDocumentIds`): attaching and detaching append a revision, and the supporting document record's link (`transactionId` / `fiscalYearId`) is updated in the same `runTransaction`. The Storage object is written once and never overwritten or deleted; removing a supporting document is a soft delete of its record, allowed only once it is unattached.
 
 ## Security Rules policy
 
 - The rules are the only server-side line of defense. Any change to them requires a matching test in `packages/web/tests/rules/`.
 - For transactions the rules check the header's `debitTotal == creditTotal && debitTotal > 0`, `is int`, a non-empty `postings` of at most 50, a `date` inside the year, `createdBy` / `updatedBy` / `createdAt` / `updatedAt`, the `currentRevision` link to a revision written in the same request with identical content, and the parent year's `status == "open"`. Revisions and monthly summaries are likewise writable only while the year is open. Only the owner may modify a closed year; a member is revoked by setting `role: "revoked"`, never by deletion.
-- **Limits of the rules language** (no loops): validating every element of `postings[].amount`, and reconciling the posting sums against the header totals, are both impossible. Domain-layer validation plus `rebuildMonthlyTransactionSummaries` cover them (see the README).
+- For supporting documents the rules pin the file metadata and the uploader, require an attached supporting document to be named by the live transaction it points at as of the end of the same request, and forbid soft-deleting one while attached. `storage.rules` allows a supporting document object to be created once by a member with write access and never overwritten or deleted.
+- **Limits of the rules language** (no loops): validating every element of `postings[].amount`, reconciling the posting sums against the header totals, and checking every entry of `supportingDocumentIds` are all impossible. Domain-layer validation plus `rebuildMonthlyTransactionSummaries` cover them (see the README).
+- The Storage emulator resolves `firestore.get()` against the project the emulators were started with, so the Storage rules test runs under `demo-account-ledgers` (shared with the integration tests, never cleared) rather than a per-file project ID.
 
 ## Testing conventions
 

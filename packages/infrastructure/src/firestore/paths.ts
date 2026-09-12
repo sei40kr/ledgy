@@ -16,6 +16,9 @@ export const partnersPath = (tenantId: string) =>
 
 export const tagsPath = (tenantId: string) => `${tenantPath(tenantId)}/tags`;
 
+export const supportingDocumentsPath = (tenantId: string) =>
+  `${tenantPath(tenantId)}/supportingDocuments`;
+
 export const fiscalYearsPath = (tenantId: string) =>
   `${tenantPath(tenantId)}/fiscalYears`;
 

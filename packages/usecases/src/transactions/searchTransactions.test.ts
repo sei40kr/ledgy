@@ -39,6 +39,7 @@ function transaction(overrides: Partial<Transaction>): Transaction {
         memo: "",
       },
     ],
+    supportingDocumentIds: [],
     deleted: false,
     ...overrides,
   };

@@ -47,6 +47,8 @@ function fakeDeps(
     create: unused,
     update: unused,
     softDelete: unused,
+    attachSupportingDocument: unused,
+    detachSupportingDocument: unused,
     get: unused,
     listRevisions: unused,
     search: unused,

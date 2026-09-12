@@ -19,6 +19,13 @@ export {
   OpeningBalanceUnbalancedError,
 } from "./fiscalYears/errors";
 export { PartnerNameRequiredError, PartnerNotFoundError } from "./partners/errors";
+export {
+  SupportingDocumentAlreadyAttachedError,
+  SupportingDocumentAttachedElsewhereError,
+  SupportingDocumentFileNameRequiredError,
+  SupportingDocumentNotAttachedError,
+  SupportingDocumentNotFoundError,
+} from "./supportingDocuments/errors";
 export { TagNameRequiredError, TagNotFoundError } from "./tags/errors";
 export {
   TransactionDeletedError,
@@ -50,6 +57,10 @@ export {
   type TransactionSearchParams,
   type TransactionsPage,
 } from "./ports/transactionRepository";
+export {
+  type SupportingDocumentFile,
+  type SupportingDocumentRepository,
+} from "./ports/supportingDocumentRepository";
 
 export { signInUseCase } from "./signIn";
 export { signOutUseCase } from "./signOut";
@@ -95,6 +106,7 @@ export {
   postingsToOpeningBalance,
 } from "./fiscalYears/openingBalanceTransaction";
 
+export { attachSupportingDocumentToTransactionUseCase } from "./transactions/attachSupportingDocumentToTransaction";
 export { createTransactionUseCase } from "./transactions/createTransaction";
 export { getTransactionUseCase } from "./transactions/getTransaction";
 export {
@@ -103,6 +115,12 @@ export {
 } from "./transactions/searchTransactions";
 export { softDeleteTransactionUseCase } from "./transactions/softDeleteTransaction";
 export { updateTransactionUseCase } from "./transactions/updateTransaction";
+
+export { deleteSupportingDocumentUseCase } from "./supportingDocuments/deleteSupportingDocument";
+export { getSupportingDocumentUseCase } from "./supportingDocuments/getSupportingDocument";
+export { getSupportingDocumentFileUrlUseCase } from "./supportingDocuments/getSupportingDocumentFileUrl";
+export { listSupportingDocumentsUseCase } from "./supportingDocuments/listSupportingDocuments";
+export { uploadSupportingDocumentUseCase } from "./supportingDocuments/uploadSupportingDocument";
 
 export { getAccountLedgerUseCase } from "./ledger/getAccountLedger";
 export { monthKeyToDateRange } from "./ledger/monthKeyToDateRange";

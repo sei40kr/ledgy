@@ -15,3 +15,4 @@ export type SubAccountTitleId = Id<"SubAccountTitleId">;
 export type PartnerId = Id<"PartnerId">;
 export type TagId = Id<"TagId">;
 export type TransactionId = Id<"TransactionId">;
+export type SupportingDocumentId = Id<"SupportingDocumentId">;

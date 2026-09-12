@@ -18,3 +18,8 @@ output "firestore_database" {
   description = "Firestore database name"
   value       = google_firestore_database.default.name
 }
+
+output "storage_bucket" {
+  description = "Bucket holding the supportingDocument files (NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET)"
+  value       = google_storage_bucket.supportingDocuments.name
+}

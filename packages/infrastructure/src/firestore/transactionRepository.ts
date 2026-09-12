@@ -31,6 +31,7 @@ import {
 } from "firebase/firestore";
 import type {
   PartnerId,
+  SupportingDocumentId,
   SystemTransactionKind,
   TagId,
   Transaction,
@@ -42,6 +43,10 @@ import {
   OPENING_BALANCE_TRANSACTION_ID,
   openingBalanceToPostings,
   postingsToOpeningBalance,
+  SupportingDocumentAlreadyAttachedError,
+  SupportingDocumentAttachedElsewhereError,
+  SupportingDocumentNotAttachedError,
+  SupportingDocumentNotFoundError,
   TransactionDeletedError,
   TransactionNotFoundError,
   type TransactionRepository,
@@ -51,6 +56,7 @@ import type {
   TransactionRevisionDocument,
 } from "./documents";
 import {
+  supportingDocumentsPath,
   transactionRevisionsPath,
   transactionsPath,
   monthlyTransactionSummariesPath,
@@ -83,6 +89,7 @@ const transactionConverter: FirestoreDataConverter<Transaction> = {
       tags: transaction.tags,
       system: transaction.system,
       postings: normalizePostings(transaction.postings),
+      supportingDocumentIds: transaction.supportingDocumentIds,
       deleted: transaction.deleted,
       updatedAt: serverTimestamp(),
     };
@@ -104,6 +111,7 @@ const transactionConverter: FirestoreDataConverter<Transaction> = {
       tags: (d.tags ?? []) as TagId[],
       system: (d.system ?? null) as SystemTransactionKind | null,
       postings: toPostings(d.postings),
+      supportingDocumentIds: (d.supportingDocumentIds ?? []) as SupportingDocumentId[],
       deleted: d.deleted,
     };
   },
@@ -120,6 +128,7 @@ const transactionRevisionConverter: FirestoreDataConverter<TransactionRevision> 
       tags: revision.tags,
       system: revision.system,
       postings: normalizePostings(revision.postings),
+      supportingDocumentIds: revision.supportingDocumentIds,
       deleted: revision.deleted,
       createdAt: serverTimestamp(),
     };
@@ -139,6 +148,7 @@ const transactionRevisionConverter: FirestoreDataConverter<TransactionRevision> 
       tags: (d.tags ?? []) as TagId[],
       system: (d.system ?? null) as SystemTransactionKind | null,
       postings: toPostings(d.postings),
+      supportingDocumentIds: (d.supportingDocumentIds ?? []) as SupportingDocumentId[],
       deleted: d.deleted,
     };
   },
@@ -189,6 +199,37 @@ function writeSummary(
 }
 
 /**
+ * Reads a supporting document inside the transaction and checks that it can be attached: it
+ * exists, is live, and is not attached to another transaction.
+ */
+async function assertSupportingDocumentAttachable(
+  tx: FirestoreTransaction,
+  ref: DocumentReference,
+): Promise<void> {
+  const snapshot = await tx.get(ref);
+  const supportingDocument = snapshot.data();
+  if (!supportingDocument || supportingDocument.deleted) {
+    throw new SupportingDocumentNotFoundError();
+  }
+  if (supportingDocument.transactionId) {
+    throw new SupportingDocumentAttachedElsewhereError();
+  }
+}
+
+/** Points the supporting document's attachment link at a transaction, or clears it. */
+function writeSupportingDocumentAttachment(
+  tx: FirestoreTransaction,
+  ref: DocumentReference,
+  attachedTo: { yearId: string; transactionId: string } | null,
+): void {
+  tx.update(ref, {
+    transactionId: attachedTo?.transactionId ?? null,
+    fiscalYearId: attachedTo?.yearId ?? null,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/**
  * Repository implementation that creates, updates, and soft-deletes transactions
  * atomically via runTransaction. Firestore requires every read to precede every
  * write, so the counter, the existing transaction, and the summaries are all read
@@ -198,7 +239,7 @@ export function createFirestoreTransactionRepository(
   db: Firestore,
 ): TransactionRepository {
   return {
-    async create({ tenantId, yearId, draft, createdBy }) {
+    async create({ tenantId, yearId, draft, supportingDocumentIds, createdBy }) {
       return runTransaction(db, async (tx) => {
         // The domain layer checks that the transaction balances.
         const { debitTotal, creditTotal } = validatePostings(draft.postings);
@@ -211,6 +252,12 @@ export function createFirestoreTransactionRepository(
           monthKey,
         );
         const summary = await readSummary(tx, summaryRef);
+        const supportingDocumentRefs = supportingDocumentIds.map((supportingDocumentId) =>
+          doc(db, supportingDocumentsPath(tenantId), supportingDocumentId),
+        );
+        for (const supportingDocumentRef of supportingDocumentRefs) {
+          await assertSupportingDocumentAttachable(tx, supportingDocumentRef);
+        }
 
         // --- writes ---
         const content = {
@@ -220,6 +267,7 @@ export function createFirestoreTransactionRepository(
           tags: draft.tags,
           system: null,
           postings: normalizePostings(draft.postings),
+          supportingDocumentIds,
           deleted: false,
         };
         // The first version of the transaction's history holds the content.
@@ -244,6 +292,13 @@ export function createFirestoreTransactionRepository(
         });
         // Apply the delta to that month's monthlyTransactionSummaries.
         writeSummary(tx, summaryRef, applyPostingsToMonthlyTransactionSummary(summary, draft.postings, 1));
+        // The supporting documents uploaded ahead of the transaction now belong to it.
+        for (const supportingDocumentRef of supportingDocumentRefs) {
+          writeSupportingDocumentAttachment(tx, supportingDocumentRef, {
+            yearId,
+            transactionId: transactionRef.id,
+          });
+        }
 
         return { transactionId: transactionRef.id as TransactionId };
       });
@@ -289,6 +344,8 @@ export function createFirestoreTransactionRepository(
           tags: draft.tags,
           system: null,
           postings: normalizePostings(draft.postings),
+          // Attached supporting documents are managed by attachSupportingDocument / detachSupportingDocument.
+          supportingDocumentIds: contentOf(current).supportingDocumentIds,
           deleted: false,
         };
         // The new version's full content goes into the history.
@@ -370,6 +427,51 @@ export function createFirestoreTransactionRepository(
           updatedAt: serverTimestamp(),
           currentRevision,
         });
+        // The supporting documents stay in the deleted version's history but are free to be
+        // attached to the corrected transaction.
+        for (const supportingDocumentId of contentOf(current).supportingDocumentIds) {
+          writeSupportingDocumentAttachment(tx, doc(db, supportingDocumentsPath(tenantId), supportingDocumentId), null);
+        }
+      });
+    },
+
+    async attachSupportingDocument({ tenantId, yearId, transactionId, supportingDocumentId, updatedBy }) {
+      await runTransaction(db, async (tx) => {
+        // --- reads ---
+        const transactionRef = doc(db, transactionsPath(tenantId, yearId), transactionId);
+        const current = await readLiveTransaction(tx, transactionRef);
+        const content = contentOf(current);
+        if (content.supportingDocumentIds.includes(supportingDocumentId)) {
+          throw new SupportingDocumentAlreadyAttachedError();
+        }
+        const supportingDocumentRef = doc(db, supportingDocumentsPath(tenantId), supportingDocumentId);
+        await assertSupportingDocumentAttachable(tx, supportingDocumentRef);
+
+        // --- writes ---
+        writeSupportingDocumentChange(tx, db, tenantId, yearId, transactionId, {
+          ...content,
+          supportingDocumentIds: [...content.supportingDocumentIds, supportingDocumentId],
+        }, updatedBy);
+        writeSupportingDocumentAttachment(tx, supportingDocumentRef, { yearId, transactionId });
+      });
+    },
+
+    async detachSupportingDocument({ tenantId, yearId, transactionId, supportingDocumentId, updatedBy }) {
+      await runTransaction(db, async (tx) => {
+        // --- reads ---
+        const transactionRef = doc(db, transactionsPath(tenantId, yearId), transactionId);
+        const current = await readLiveTransaction(tx, transactionRef);
+        const content = contentOf(current);
+        if (!content.supportingDocumentIds.includes(supportingDocumentId)) {
+          throw new SupportingDocumentNotAttachedError();
+        }
+
+        // --- writes ---
+        writeSupportingDocumentChange(tx, db, tenantId, yearId, transactionId, {
+          ...content,
+          supportingDocumentIds: content.supportingDocumentIds.filter((id) => id !== supportingDocumentId),
+        }, updatedBy);
+        writeSupportingDocumentAttachment(tx, doc(db, supportingDocumentsPath(tenantId), supportingDocumentId), null);
       });
     },
 
@@ -509,6 +611,7 @@ export function createFirestoreTransactionRepository(
           tags: [] as TagId[],
           system: "openingBalance" as const,
           postings: normalizePostings(postings),
+          supportingDocumentIds: [] as SupportingDocumentId[],
           deleted: false,
         };
         // Versioned like every other write. On update, the createdBy/createdAt of
@@ -533,12 +636,14 @@ export function createFirestoreTransactionRepository(
   };
 }
 
-/** The stored header's content as the soft-deleted version: same content, deleted flipped. */
-function deletedVersionOf(
-  current: DocumentData,
-): Omit<TransactionRevision, "id" | "createdAt" | "createdBy" | "postings"> & {
-  postings: DocumentData[];
-} {
+/** The content of one version as stored, with the postings left in their stored shape. */
+type StoredContent = Omit<
+  TransactionRevision,
+  "id" | "createdAt" | "createdBy" | "postings"
+> & { postings: DocumentData[] };
+
+/** The stored header's current content, ready to be carried into the next version unchanged. */
+function contentOf(current: DocumentData): StoredContent {
   return {
     date: current.date.toDate(),
     description: current.description,
@@ -546,8 +651,56 @@ function deletedVersionOf(
     tags: (current.tags ?? []) as TagId[],
     system: (current.system ?? null) as SystemTransactionKind | null,
     postings: current.postings as DocumentData[],
-    deleted: true,
+    supportingDocumentIds: (current.supportingDocumentIds ?? []) as SupportingDocumentId[],
+    deleted: current.deleted,
   };
+}
+
+/** The stored header's content as the soft-deleted version: same content, deleted flipped. */
+function deletedVersionOf(current: DocumentData): StoredContent {
+  return { ...contentOf(current), deleted: true };
+}
+
+/** Reads a transaction header inside the transaction, refusing a missing or deleted one. */
+async function readLiveTransaction(
+  tx: FirestoreTransaction,
+  ref: DocumentReference,
+): Promise<DocumentData> {
+  const snapshot = await tx.get(ref);
+  if (!snapshot.exists()) {
+    throw new TransactionNotFoundError();
+  }
+  const current = snapshot.data();
+  if (current.deleted) {
+    throw new TransactionDeletedError();
+  }
+  return current;
+}
+
+/**
+ * Records a version that changes only the attached supporting documents: the new content
+ * goes into the history and the header mirrors it. The postings, and so the
+ * totals and the summaries, are untouched.
+ */
+function writeSupportingDocumentChange(
+  tx: FirestoreTransaction,
+  db: Firestore,
+  tenantId: string,
+  yearId: string,
+  transactionId: string,
+  content: StoredContent,
+  updatedBy: UserId,
+): void {
+  const currentRevision = writeRevision(tx, db, tenantId, yearId, transactionId, {
+    createdBy: updatedBy,
+    ...content,
+  });
+  tx.update(doc(db, transactionsPath(tenantId, yearId), transactionId), {
+    supportingDocumentIds: content.supportingDocumentIds,
+    currentRevision,
+    updatedBy,
+    updatedAt: serverTimestamp(),
+  });
 }
 
 /**

@@ -23,15 +23,22 @@ import { getAccountLedgerUseCase } from "@account-ledgers/usecases";
 import { signInUseCase } from "@account-ledgers/usecases";
 import { signOutUseCase } from "@account-ledgers/usecases";
 import { signUpUseCase } from "@account-ledgers/usecases";
+import { attachSupportingDocumentToTransactionUseCase } from "@account-ledgers/usecases";
 import { createTransactionUseCase } from "@account-ledgers/usecases";
 import { getTransactionUseCase } from "@account-ledgers/usecases";
 import { searchTransactionsUseCase } from "@account-ledgers/usecases";
 import { softDeleteTransactionUseCase } from "@account-ledgers/usecases";
 import { updateTransactionUseCase } from "@account-ledgers/usecases";
+import { deleteSupportingDocumentUseCase } from "@account-ledgers/usecases";
+import { getSupportingDocumentUseCase } from "@account-ledgers/usecases";
+import { getSupportingDocumentFileUrlUseCase } from "@account-ledgers/usecases";
+import { listSupportingDocumentsUseCase } from "@account-ledgers/usecases";
+import { uploadSupportingDocumentUseCase } from "@account-ledgers/usecases";
 import { getTrialBalanceUseCase } from "@account-ledgers/usecases";
 import { rebuildMonthlyTransactionSummariesUseCase } from "@account-ledgers/usecases";
 import { createFirebaseAuthAdapter } from "./auth/firebaseAuthAdapter";
-import { auth, db } from "./firebase/app";
+import { auth, db, storage } from "./firebase/app";
+import { createFirebaseSupportingDocumentRepository } from "./firebase/supportingDocumentRepository";
 import { createFirestoreAccountTitleRepository } from "./firestore/accountTitleRepository";
 import { createFirestorePartnerRepository } from "./firestore/partnerRepository";
 import { createFirestoreTagRepository } from "./firestore/tagRepository";
@@ -48,6 +55,7 @@ const tagRepository = createFirestoreTagRepository(db);
 const fiscalYearRepository = createFirestoreFiscalYearRepository(db);
 const transactionRepository = createFirestoreTransactionRepository(db);
 const monthlyTransactionSummaryRepository = createFirestoreMonthlyTransactionSummaryRepository(db);
+const supportingDocumentRepository = createFirebaseSupportingDocumentRepository(db, storage);
 
 const accountTitles = { accountTitles: accountTitleRepository };
 const partners = { partners: partnerRepository };
@@ -57,6 +65,7 @@ const transactions = {
   transactions: transactionRepository,
   fiscalYears: fiscalYearRepository,
 };
+const supportingDocuments = { supportingDocuments: supportingDocumentRepository };
 
 export const usecases = {
   signUp: signUpUseCase({ auth: authAdapter, tenants: tenantRepository }),
@@ -98,8 +107,16 @@ export const usecases = {
     create: createTransactionUseCase(transactions),
     update: updateTransactionUseCase(transactions),
     softDelete: softDeleteTransactionUseCase(transactions),
+    attachSupportingDocument: attachSupportingDocumentToTransactionUseCase(transactions),
     get: getTransactionUseCase({ transactions: transactionRepository }),
     search: searchTransactionsUseCase({ transactions: transactionRepository }),
+  },
+  supportingDocuments: {
+    list: listSupportingDocumentsUseCase(supportingDocuments),
+    get: getSupportingDocumentUseCase(supportingDocuments),
+    getFileUrl: getSupportingDocumentFileUrlUseCase(supportingDocuments),
+    upload: uploadSupportingDocumentUseCase(supportingDocuments),
+    delete: deleteSupportingDocumentUseCase({ ...supportingDocuments, ...transactions }),
   },
   ledger: {
     getAccountLedger: getAccountLedgerUseCase({

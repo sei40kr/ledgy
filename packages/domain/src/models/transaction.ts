@@ -1,6 +1,7 @@
 import type {
   AccountTitleId,
   PartnerId,
+  SupportingDocumentId,
   SubAccountTitleId,
   TagId,
   TransactionId,
@@ -53,6 +54,8 @@ export interface TransactionRevision {
   partners: PartnerId[];
   tags: TagId[];
   postings: Posting[];
+  /** Supporting documents attached as of this version. Attaching and detaching are versioned like any other change. */
+  supportingDocumentIds: SupportingDocumentId[];
   deleted: boolean;
   /** Non-null when this version was system-generated rather than user-entered. */
   system: SystemTransactionKind | null;
@@ -78,6 +81,8 @@ export interface Transaction {
   partners: PartnerId[];
   tags: TagId[];
   postings: Posting[];
+  /** Supporting documents attached to the transaction (never to a posting). Each supporting document is attached to at most one live transaction. */
+  supportingDocumentIds: SupportingDocumentId[];
   deleted: boolean;
   /** Non-null when the transaction was system-generated rather than user-entered. */
   system: SystemTransactionKind | null;

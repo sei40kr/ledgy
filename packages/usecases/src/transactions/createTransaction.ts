@@ -2,6 +2,7 @@ import type {
   TenantId,
   UserId,
   FiscalYearId,
+  SupportingDocumentId,
   TransactionId,
 } from "@account-ledgers/domain";
 import type { FiscalYearRepository } from "../ports/fiscalYearRepository";
@@ -19,6 +20,8 @@ export function createTransactionUseCase(deps: {
     tenantId: TenantId;
     yearId: FiscalYearId;
     draft: TransactionDraft;
+    /** Supporting documents uploaded ahead of the transaction, attached to it on creation. */
+    supportingDocumentIds?: SupportingDocumentId[];
     createdBy: UserId;
   }): Promise<{ transactionId: TransactionId }> {
     const year = await getOpenFiscalYear(
@@ -27,6 +30,9 @@ export function createTransactionUseCase(deps: {
       input.yearId,
     );
     validateDraft(input.draft, year);
-    return deps.transactions.create(input);
+    return deps.transactions.create({
+      ...input,
+      supportingDocumentIds: [...new Set(input.supportingDocumentIds ?? [])],
+    });
   };
 }

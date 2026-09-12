@@ -5,6 +5,9 @@ import {
   PostingAmountNotPositiveError,
   PostingSideInvalidError,
   PostingsEmptyError,
+  SupportingDocumentContentTypeUnsupportedError,
+  SupportingDocumentFileEmptyError,
+  SupportingDocumentFileTooLargeError,
   TooManyPostingsError,
   TransactionTotalNotPositiveError,
   TransactionUnbalancedError,
@@ -26,6 +29,11 @@ import {
   PartnerNameRequiredError,
   PartnerNotFoundError,
   SubAccountTitleNotFoundError,
+  SupportingDocumentAlreadyAttachedError,
+  SupportingDocumentAttachedElsewhereError,
+  SupportingDocumentFileNameRequiredError,
+  SupportingDocumentNotAttachedError,
+  SupportingDocumentNotFoundError,
   TagNameRequiredError,
   TagNotFoundError,
   TooManyAuthAttemptsError,
@@ -67,6 +75,15 @@ function domainErrorMessage(error: unknown): string | null {
   }
   if (error instanceof TransactionTotalNotPositiveError) {
     return "仕訳の合計金額は1円以上にしてください";
+  }
+  if (error instanceof SupportingDocumentContentTypeUnsupportedError) {
+    return "証憑にはPDFまたは画像(JPEG・PNG・WebP)のみ添付できます";
+  }
+  if (error instanceof SupportingDocumentFileEmptyError) {
+    return "空のファイルは添付できません";
+  }
+  if (error instanceof SupportingDocumentFileTooLargeError) {
+    return `ファイルサイズは${Math.floor(error.maxSize / (1024 * 1024))}MB以下にしてください`;
   }
   return null;
 }
@@ -110,6 +127,19 @@ function applicationErrorMessage(error: unknown): string | null {
   if (error instanceof TransactionNotFoundError) return "仕訳が見つかりません";
   if (error instanceof TransactionDeletedError) {
     return "削除済の仕訳は編集できません";
+  }
+  if (error instanceof SupportingDocumentNotFoundError) return "証憑が見つかりません";
+  if (error instanceof SupportingDocumentFileNameRequiredError) {
+    return "ファイル名が空です";
+  }
+  if (error instanceof SupportingDocumentAlreadyAttachedError) {
+    return "この証憑は既にこの仕訳に添付されています";
+  }
+  if (error instanceof SupportingDocumentAttachedElsewhereError) {
+    return "この証憑は既に別の仕訳に添付されています";
+  }
+  if (error instanceof SupportingDocumentNotAttachedError) {
+    return "この証憑はこの仕訳に添付されていません";
   }
   if (error instanceof EmailAlreadyInUseError) {
     return "このメールアドレスは既に登録されています";

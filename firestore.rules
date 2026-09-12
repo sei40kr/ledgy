@@ -98,6 +98,63 @@ service cloud.firestore {
         allow delete: if false;
       }
 
+      // Supporting documents (証憑) are tenant-wide so they can be uploaded before the
+      // transaction exists. The file itself is the Storage object at the same
+      // path (see storage.rules); the record here is immutable except for the
+      // attachment link and the soft-delete flag.
+      match /supportingDocuments/{supportingDocumentId} {
+        function validSupportingDocument(d) {
+          return d.fileName is string && d.fileName.size() > 0
+            && d.contentType in ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
+            && d.size is int && d.size > 0 && d.size <= 20 * 1024 * 1024
+            && d.uploadedBy is string
+            && d.deleted is bool
+            && ((d.transactionId == null && d.fiscalYearId == null)
+              || (d.transactionId is string && d.fiscalYearId is string))
+            // A deleted supporting document is never still attached.
+            && (!d.deleted || d.transactionId == null);
+        }
+        function transactionAfter(yearId, transactionId) {
+          return getAfter(/databases/$(database)/documents/tenants/$(tenantId)/fiscalYears/$(yearId)/transactions/$(transactionId)).data;
+        }
+        // An attached supporting document must be named by the live transaction it points
+        // at, as of the end of this request: the link is written together with
+        // the transaction's new version.
+        function attachmentIsMirrored(d) {
+          return d.transactionId == null
+            || (transactionAfter(d.fiscalYearId, d.transactionId).supportingDocumentIds.hasAny([supportingDocumentId])
+              && transactionAfter(d.fiscalYearId, d.transactionId).deleted == false);
+        }
+        // Leaving a transaction requires that transaction to have let go of the
+        // supporting document in this same request (a detach, or its soft delete), which in
+        // turn requires its year to be open.
+        function releasedByPreviousTransaction() {
+          return resource.data.transactionId == null
+            || request.resource.data.transactionId == resource.data.transactionId
+            || !transactionAfter(resource.data.fiscalYearId, resource.data.transactionId).supportingDocumentIds.hasAny([supportingDocumentId])
+            || transactionAfter(resource.data.fiscalYearId, resource.data.transactionId).deleted == true;
+        }
+
+        allow read: if isMember();
+        allow create: if canWrite()
+          && validSupportingDocument(request.resource.data)
+          && request.resource.data.uploadedBy == request.auth.uid
+          && request.resource.data.uploadedAt == request.time
+          && request.resource.data.transactionId == null
+          && request.resource.data.deleted == false;
+        allow update: if canWrite()
+          && validSupportingDocument(request.resource.data)
+          // The file and its provenance never change: a corrected scan is a new supporting document.
+          && request.resource.data.fileName == resource.data.fileName
+          && request.resource.data.contentType == resource.data.contentType
+          && request.resource.data.size == resource.data.size
+          && request.resource.data.uploadedBy == resource.data.uploadedBy
+          && request.resource.data.uploadedAt == resource.data.uploadedAt
+          && attachmentIsMirrored(request.resource.data)
+          && releasedByPreviousTransaction();
+        allow delete: if false;
+      }
+
       match /fiscalYears/{yearId} {
         function year() {
           return get(/databases/$(database)/documents/tenants/$(tenantId)/fiscalYears/$(yearId)).data;
@@ -135,6 +192,8 @@ service cloud.firestore {
               && d.postings is list
               && d.postings.size() > 0
               && d.postings.size() <= 50
+              // Which supporting documents are attached is part of the versioned content.
+              && d.supportingDocumentIds is list
               && d.deleted is bool
               && (d.get('system', null) == null || d.system is string);
           }
@@ -151,6 +210,7 @@ service cloud.firestore {
               && getAfter(revisionPath(d.currentRevision)).data.partners == d.partners
               && getAfter(revisionPath(d.currentRevision)).data.tags == d.tags
               && getAfter(revisionPath(d.currentRevision)).data.postings == d.postings
+              && getAfter(revisionPath(d.currentRevision)).data.supportingDocumentIds == d.supportingDocumentIds
               && getAfter(revisionPath(d.currentRevision)).data.deleted == d.deleted
               && getAfter(revisionPath(d.currentRevision)).data.get('system', null) == d.get('system', null);
           }

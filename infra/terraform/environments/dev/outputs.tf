@@ -10,3 +10,7 @@ output "web_api_key" {
 output "auth_domain" {
   value = module.firebase.auth_domain
 }
+
+output "storage_bucket" {
+  value = module.firebase.storage_bucket
+}

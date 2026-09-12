@@ -8,6 +8,7 @@ export {
   type AccountTitleId,
   type FiscalYearId,
   type PartnerId,
+  type SupportingDocumentId,
   type SubAccountTitleId,
   type TagId,
   type TenantId,
@@ -31,6 +32,17 @@ export {
 } from "./models/accountTitle";
 export { type Partner } from "./models/partner";
 export { type Tag } from "./models/tag";
+export {
+  MAX_SUPPORTING_DOCUMENT_FILE_SIZE,
+  type SupportingDocument,
+  type SupportingDocumentAttachment,
+  SUPPORTING_DOCUMENT_CONTENT_TYPES,
+  SupportingDocumentContentTypeUnsupportedError,
+  type SupportingDocumentContentType,
+  SupportingDocumentFileEmptyError,
+  SupportingDocumentFileTooLargeError,
+  validateSupportingDocumentFile,
+} from "./models/supportingDocument";
 export {
   FiscalYear,
   FiscalYearPeriodInvalidError,
