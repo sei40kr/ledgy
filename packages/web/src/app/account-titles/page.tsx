@@ -29,6 +29,7 @@ import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { AppShell } from "@/components/AppShell";
 import { CategoryBadge } from "@/components/CategoryBadge";
+import { PlusIcon } from "@/components/PlusIcon";
 import { SearchWordsInput } from "@/components/SearchWordsInput";
 import { TableCard } from "@/components/TableCard";
 import { ACCOUNT_TITLE_CATEGORY_LABELS } from "@/components/labels";
@@ -110,6 +111,7 @@ function AccountsContent() {
               })
             }
           >
+            <PlusIcon />
             科目を追加
           </Button>
         </HStack>
