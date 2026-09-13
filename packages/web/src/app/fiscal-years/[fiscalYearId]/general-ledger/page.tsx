@@ -1,9 +1,8 @@
 "use client";
 
 import {
-  type AccountTitle,
-  type FiscalYear,
   type Transaction,
+  type UserId,
   normalBalanceSide,
 } from "@account-ledgers/domain";
 import {
@@ -16,21 +15,27 @@ import {
   Table,
   Text,
 } from "@chakra-ui/react";
+import { useRouter } from "next/navigation";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import {
   type AccountTitleLedger,
   monthKeyToDateRange,
 } from "@account-ledgers/usecases";
-import { AccountTitleBadge } from "@/components/AccountTitleBadge";
 import { AppShell } from "@/components/AppShell";
 import { FiscalYearRequired } from "@/components/FiscalYearRequired";
+import { JournalSupportingDocumentsDialog } from "@/components/JournalSupportingDocumentsDialog";
+import {
+  JournalTable,
+  type JournalTableProps,
+} from "@/components/JournalTable";
 import { MonetaryAmountText } from "@/components/MonetaryAmountText";
 import { SearchableSelect } from "@/components/SearchableSelect";
 import { TableCard } from "@/components/TableCard";
-import { formatDateInFiscalYear } from "@/components/dates";
 import { useAccountTitles } from "@/hooks/useAccountTitles";
 import { useAuth } from "@/hooks/useAuth";
 import { useFiscalYears } from "@/hooks/useFiscalYears";
+import { usePartners } from "@/hooks/usePartners";
+import { useTags } from "@/hooks/useTags";
 import { usecases } from "@account-ledgers/infrastructure/container";
 import { toDisplayMessage } from "@/components/errorMessages";
 
@@ -43,9 +48,12 @@ export default function GeneralLedgerPage() {
 }
 
 function GeneralLedgerContent() {
-  const { tenantId } = useAuth();
+  const { tenantId, user } = useAuth();
   const { currentYear } = useFiscalYears();
   const { accountTitles } = useAccountTitles();
+  const { partners } = usePartners();
+  const { tags } = useTags();
+  const router = useRouter();
 
   const [accountTitleId, setAccountId] = useState("");
   const [ledger, setLedger] = useState<AccountTitleLedger | null>(null);
@@ -54,6 +62,9 @@ function GeneralLedgerContent() {
   const [expandedMonth, setExpandedMonth] = useState<string | null>(null);
   const [monthTransactions, setMonthTransactions] = useState<Transaction[]>([]);
   const [transactionsLoading, setTransactionsLoading] = useState(false);
+  // The transaction whose supporting documents are open in the dialog.
+  const [supportingDocumentsOf, setSupportingDocumentsOf] =
+    useState<Transaction | null>(null);
 
   const accountTitle = useMemo(
     () => accountTitles.find((a) => a.id === accountTitleId) ?? null,
@@ -66,6 +77,14 @@ function GeneralLedgerContent() {
   const activeAccountTitles = useMemo(
     () => accountTitles.filter((a) => a.isActive),
     [accountTitles],
+  );
+  const partnerNameById = useMemo(
+    () => new Map(partners.map((p) => [p.id, p.name])),
+    [partners],
+  );
+  const tagNameById = useMemo(
+    () => new Map(tags.map((t) => [t.id, t.name])),
+    [tags],
   );
 
   const loadLedger = useCallback(async () => {
@@ -118,6 +137,20 @@ function GeneralLedgerContent() {
     } finally {
       setTransactionsLoading(false);
     }
+  }
+
+  // After the dialog attaches or detaches, refresh the header the indicator reads.
+  async function refreshTransaction() {
+    if (!tenantId || !currentYear || !supportingDocumentsOf) return;
+    const fresh = await usecases.transactions.get({
+      tenantId,
+      yearId: currentYear.id,
+      transactionId: supportingDocumentsOf.id,
+    });
+    if (!fresh) return;
+    setMonthTransactions((prev) =>
+      prev.map((t) => (t.id === fresh.id ? fresh : t)),
+    );
   }
 
   if (!currentYear) {
@@ -232,9 +265,16 @@ function GeneralLedgerContent() {
                       <MonthDetail
                         loading={transactionsLoading}
                         transactions={monthTransactions}
-                        accountTitleId={accountTitle.id}
-                        accountById={accountById}
                         fiscalYear={currentYear}
+                        accountTitleById={accountById}
+                        partnerNameById={partnerNameById}
+                        tagNameById={tagNameById}
+                        onOpen={(transaction) =>
+                          router.push(
+                            `/fiscal-years/${currentYear.id}/transactions/${transaction.id}/edit/`,
+                          )
+                        }
+                        onOpenSupportingDocuments={setSupportingDocumentsOf}
                       />
                     </Table.Cell>
                   </Table.Row>
@@ -257,24 +297,32 @@ function GeneralLedgerContent() {
         </Table.Root>
         </TableCard>
       )}
+
+      {supportingDocumentsOf && tenantId && user && (
+        <JournalSupportingDocumentsDialog
+          tenantId={tenantId}
+          yearId={currentYear.id}
+          userId={user.uid as UserId}
+          transaction={supportingDocumentsOf}
+          disabled={
+            currentYear.status !== "open" || supportingDocumentsOf.deleted
+          }
+          onChanged={() => void refreshTransaction()}
+          onClose={() => setSupportingDocumentsOf(null)}
+        />
+      )}
     </Stack>
   );
 }
 
-/** Detail shown when a month is clicked: the transactions in that month touching that account title. */
+/**
+ * Detail shown when a month is clicked: the transactions of that month touching
+ * the account title, shown exactly as the journal shows them.
+ */
 function MonthDetail({
   loading,
-  transactions,
-  accountTitleId,
-  accountById,
-  fiscalYear,
-}: {
-  loading: boolean;
-  transactions: Transaction[];
-  accountTitleId: string;
-  accountById: Map<string, AccountTitle>;
-  fiscalYear: FiscalYear | null;
-}) {
+  ...journal
+}: JournalTableProps & { loading: boolean }) {
   if (loading) {
     return (
       <Box p={4}>
@@ -282,7 +330,7 @@ function MonthDetail({
       </Box>
     );
   }
-  if (transactions.length === 0) {
+  if (journal.transactions.length === 0) {
     return (
       <Box p={4}>
         <Text fontSize="sm" color="fg.muted">
@@ -292,70 +340,8 @@ function MonthDetail({
     );
   }
   return (
-    <Table.Root size="md" bg="bg.subtle">
-      <Table.Header>
-        <Table.Row>
-          <Table.ColumnHeader w="5rem">日付</Table.ColumnHeader>
-          <Table.ColumnHeader>摘要</Table.ColumnHeader>
-          <Table.ColumnHeader>相手科目</Table.ColumnHeader>
-          <Table.ColumnHeader textAlign="right">借方(円)</Table.ColumnHeader>
-          <Table.ColumnHeader textAlign="right">貸方(円)</Table.ColumnHeader>
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
-        {transactions.flatMap((transaction) =>
-          transaction.postings
-            .filter((posting) => posting.accountTitleId === accountTitleId)
-            .map((posting, i) => {
-              const seen = new Set<string>();
-              const counterparts: AccountTitle[] = [];
-              for (const l of transaction.postings) {
-                if (l.side === posting.side) continue;
-                const account = accountById.get(l.accountTitleId);
-                if (account && !seen.has(account.id)) {
-                  seen.add(account.id);
-                  counterparts.push(account);
-                }
-              }
-              return (
-                <Table.Row key={`${transaction.id}-${i}`}>
-                  <Table.Cell fontFamily="mono" color="fg.muted">
-                    {formatDateInFiscalYear(
-                      transaction.date,
-                      fiscalYear,
-                    )}
-                  </Table.Cell>
-                  <Table.Cell>{posting.memo}</Table.Cell>
-                  <Table.Cell>
-                    <HStack gap={1} flexWrap="wrap">
-                      {counterparts.map((account) => (
-                        <AccountTitleBadge
-                          key={account.id}
-                          name={account.name}
-                          category={account.category}
-                        />
-                      ))}
-                    </HStack>
-                  </Table.Cell>
-                  <Table.Cell textAlign="right" fontFamily="mono">
-                    {posting.side === "debit" ? (
-                      <MonetaryAmountText value={posting.amount.value} />
-                    ) : (
-                      ""
-                    )}
-                  </Table.Cell>
-                  <Table.Cell textAlign="right" fontFamily="mono">
-                    {posting.side === "credit" ? (
-                      <MonetaryAmountText value={posting.amount.value} />
-                    ) : (
-                      ""
-                    )}
-                  </Table.Cell>
-                </Table.Row>
-              );
-            }),
-        )}
-      </Table.Body>
-    </Table.Root>
+    <Box bg="bg.subtle" borderYWidth="1px" borderColor="border">
+      <JournalTable {...journal} insetX={4} />
+    </Box>
   );
 }
