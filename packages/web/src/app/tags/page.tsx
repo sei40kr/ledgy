@@ -17,6 +17,7 @@ import {
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { AppShell } from "@/components/AppShell";
+import { PlusIcon } from "@/components/PlusIcon";
 import { SearchWordsInput } from "@/components/SearchWordsInput";
 import { TableCard } from "@/components/TableCard";
 import { useAuth } from "@/hooks/useAuth";
@@ -55,6 +56,7 @@ function TagsContent() {
           size="sm"
           onClick={() => setForm({ tagId: null, name: "", searchWords: [] })}
         >
+          <PlusIcon />
           タグを追加
         </Button>
       </Flex>
