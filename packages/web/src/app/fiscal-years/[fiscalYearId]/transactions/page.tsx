@@ -182,7 +182,7 @@ function TransactionsContent() {
             </NativeSelect.Root>
           </Field.Root>
           <Field.Root maxW="16rem">
-            <Field.Label>キーワード(摘要・取引先・メモ)</Field.Label>
+            <Field.Label>キーワード(摘要)</Field.Label>
             <Input
               size="sm"
               value={keyword}

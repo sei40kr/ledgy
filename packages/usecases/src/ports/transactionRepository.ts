@@ -21,7 +21,6 @@ import type { OpeningBalance } from "../fiscalYears/openingBalance";
 export interface TransactionDraft {
   /** Calendar date normalized to UTC midnight. */
   date: Date;
-  description: string;
   partners: PartnerId[];
   tags: TagId[];
   postings: Posting[];

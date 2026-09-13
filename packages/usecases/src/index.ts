@@ -100,7 +100,6 @@ export {
 } from "./fiscalYears/openingBalance";
 export { validateOpeningBalance } from "./fiscalYears/openingBalanceValidation";
 export {
-  OPENING_BALANCE_DESCRIPTION,
   OPENING_BALANCE_TRANSACTION_ID,
   openingBalanceToPostings,
   postingsToOpeningBalance,

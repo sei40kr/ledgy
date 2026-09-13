@@ -43,7 +43,6 @@ export function JournalSupportingDocumentsDialog({
   };
   return (
     <TransactionSupportingDocumentsDialog
-      description={transaction.description}
       tenantId={tenantId}
       uploadedBy={userId}
       supportingDocuments={supportingDocuments}

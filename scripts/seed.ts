@@ -135,6 +135,17 @@ const CONTENT_TYPES: Record<string, string> = {
   png: "image/png",
 };
 
+/** Whether two sets of postings post the same amounts to the same sides — enough
+ * to recognize a sample transaction on a date without a description to match on. */
+function samePostedAmounts(a: Posting[], b: Posting[]): boolean {
+  const key = (postings: Posting[]) =>
+    postings
+      .map((p) => `${p.side}:${p.accountTitleId}:${p.amount.value}`)
+      .sort()
+      .join("|");
+  return key(a) === key(b);
+}
+
 function posting(
   side: PostingSide,
   accountTitleId: AccountTitleId,
@@ -212,7 +223,6 @@ async function main() {
   //    multi-line compound entry. A few carry a sample supporting document.
   const drafts: {
     date: Date;
-    description: string;
     partners: string[];
     tags: string[];
     postings: Posting[];
@@ -225,42 +235,40 @@ async function main() {
     drafts.push(
       {
         date: new Date(`${year}-${mm}-05`),
-        description: "売上(掛)",
         partners: ["株式会社サンプル商事"],
         tags: ["売上"],
         postings: [
-          posting("debit", acc("売掛金"), salesAmount),
+          posting("debit", acc("売掛金"), salesAmount, { memo: "売上(掛)" }),
           posting("credit", acc("売上高"), salesAmount, {
+            memo: `${month}月分`,
             taxCategory: "taxableSales10",
           }),
         ],
       },
       {
         date: new Date(`${year}-${mm}-10`),
-        description: "売掛金回収",
         partners: ["株式会社サンプル商事"],
         tags: ["売上", "入金"],
         postings: [
-          posting("debit", acc("普通預金"), salesAmount),
-          posting("credit", acc("売掛金"), salesAmount),
+          posting("debit", acc("普通預金"), salesAmount, { memo: "売掛金回収" }),
+          posting("credit", acc("売掛金"), salesAmount, { memo: `${month}月分の入金` }),
         ],
       },
       {
         date: new Date(`${year}-${mm}-25`),
-        description: "地代家賃の支払",
         partners: ["○○不動産"],
         tags: ["固定費"],
         postings: [
           posting("debit", acc("地代家賃"), 110_000, {
+            memo: "事務所家賃",
             taxCategory: "taxablePurchase10",
           }),
-          posting("credit", acc("普通預金"), 110_000),
+          posting("credit", acc("普通預金"), 110_000, { memo: "口座振替" }),
         ],
         supportingDocuments: month === 3 ? ["invoice-rent.pdf"] : undefined,
       },
       {
         date: new Date(`${year}-${mm}-15`),
-        description: "通信費・水道光熱費の支払(複合仕訳)",
         partners: [],
         tags: ["固定費"],
         postings: [
@@ -272,20 +280,22 @@ async function main() {
             memo: "電気代",
             taxCategory: "taxablePurchase10",
           }),
-          posting("credit", acc("普通預金"), 20_800 + month * 500),
+          posting("credit", acc("普通預金"), 20_800 + month * 500, {
+            memo: "口座振替",
+          }),
         ],
         supportingDocuments: month === 2 ? ["receipt-mobile.pdf"] : undefined,
       },
       {
         date: new Date(`${year}-${mm}-20`),
-        description: "消耗品購入(現金)",
         partners: ["文具店"],
         tags: ["事務用品"],
         postings: [
           posting("debit", acc("消耗品費"), 3_000 + month * 200, {
+            memo: "文房具・コピー用紙",
             taxCategory: "taxablePurchase10",
           }),
-          posting("credit", acc("現金"), 3_000 + month * 200),
+          posting("credit", acc("現金"), 3_000 + month * 200, { memo: "小口現金" }),
         ],
         supportingDocuments: month === 4 ? ["receipt-stationery.pdf"] : undefined,
       },
@@ -295,14 +305,14 @@ async function main() {
   // A cash expense evidenced by a photographed receipt (an image rather than a PDF).
   drafts.push({
     date: new Date(`${year}-06-20`),
-    description: "タクシー代",
     partners: [],
     tags: ["交通費"],
     postings: [
       posting("debit", acc("旅費交通費"), 2_340, {
+        memo: "タクシー代",
         taxCategory: "taxablePurchase10",
       }),
-      posting("credit", acc("現金"), 2_340),
+      posting("credit", acc("現金"), 2_340, { memo: "小口現金" }),
     ],
     supportingDocuments: ["receipt-taxi.png"],
   });
@@ -310,7 +320,6 @@ async function main() {
   // One richer compound entry with several lines on both sides.
   drafts.push({
     date: new Date(`${year}-03-28`),
-    description: "各種経費のまとめ払い(複合仕訳)",
     partners: ["文具店", "○○不動産"],
     tags: ["事務用品", "固定費"],
     postings: [
@@ -368,7 +377,7 @@ async function main() {
 
   // When the sample transactions are already there (an emulator seeded before
   // the documents existed), only attach the documents to the transactions
-  // that still lack them, matched by date and description.
+  // that still lack them, matched by date and by the amounts they post.
   const existing = await usecases.transactions.search({
     tenantId,
     yearId,
@@ -385,8 +394,8 @@ async function main() {
         dateTo: draft.date,
         limit: 50,
       });
-      const transaction = page.transactions.find(
-        (t) => t.description === draft.description,
+      const transaction = page.transactions.find((t) =>
+        samePostedAmounts(t.postings, draft.postings),
       );
       if (transaction?.supportingDocumentIds.length) continue;
       const supportingDocumentIds = await uploadSupportingDocuments(draft.supportingDocuments);

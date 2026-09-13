@@ -94,7 +94,6 @@ function NewTransactionContent() {
           />
         </Box>
         <SupportingDocumentsPane
-          description=""
           tenantId={tenantId}
           uploadedBy={userId}
           supportingDocuments={supportingDocuments}

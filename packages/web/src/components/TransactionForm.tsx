@@ -78,7 +78,6 @@ const EMPTY_LINE: Line = {
 
 export interface TransactionFormValues {
   date: string;
-  description: string;
   partners: string[];
   tags: string[];
   debits: Line[];
@@ -88,7 +87,6 @@ export interface TransactionFormValues {
 /** Rebuild form values from a saved revision, splitting its postings back into the two sides. */
 export function draftToFormValues(draft: {
   date: Date;
-  description: string;
   partners: string[];
   tags: string[];
   postings: Posting[];
@@ -107,7 +105,6 @@ export function draftToFormValues(draft: {
   };
   return {
     date: formatDate(draft.date),
-    description: draft.description,
     partners: draft.partners,
     tags: draft.tags,
     debits: toLines("debit"),
@@ -195,7 +192,6 @@ export function TransactionForm({
   );
   const emptyValues: TransactionFormValues = {
     date: today,
-    description: "",
     partners: [],
     tags: [],
     debits: [EMPTY_LINE],
@@ -280,7 +276,6 @@ export function TransactionForm({
     try {
       await onSubmit({
         date: parseDateInput(data.date),
-        description: data.description.trim(),
         partners: data.partners as PartnerId[],
         tags: data.tags as TagId[],
         postings: [
@@ -290,7 +285,7 @@ export function TransactionForm({
       });
       if (resetAfterSubmit) {
         reset(emptyValues);
-        setFocus("description");
+        setFocus("date");
       }
     } catch (e) {
       setError(toDisplayMessage(e, "保存に失敗しました"));
@@ -411,16 +406,6 @@ export function TransactionForm({
           accountTitles={activeAccounts}
           disabled={disabled}
         />
-
-        <Field.Root>
-          <Field.Label>摘要</Field.Label>
-          <Input
-            size="sm"
-            placeholder="例: 文房具購入"
-            disabled={disabled}
-            {...register("description")}
-          />
-        </Field.Root>
 
         <Field.Root maxW="24rem">
           <Field.Label>取引先(任意)</Field.Label>

@@ -86,7 +86,6 @@ beforeAll(async () => {
     createdBy: tenantId as string as UserId,
     draft: {
       date: new Date("2026-01-15"),
-      description: "売上",
       partners: [],
       tags: [],
       postings: [posting("debit", "cash", 50000), posting("credit", "sales", 50000)],
@@ -98,7 +97,6 @@ beforeAll(async () => {
     createdBy: tenantId as string as UserId,
     draft: {
       date: new Date("2026-02-10"),
-      description: "経費",
       partners: [],
       tags: [],
       postings: [posting("debit", "expense", 20000), posting("credit", "cash", 20000)],

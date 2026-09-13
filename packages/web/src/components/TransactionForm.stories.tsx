@@ -71,7 +71,6 @@ const fiscalYear = new FiscalYear(
 // and tag ids are ones the mocked composition root lists.
 const savedTransaction = draftToFormValues({
   date: new Date("2026-05-10"),
-  description: "文房具購入",
   partners: ["partner-2" as PartnerId],
   tags: ["tag-2" as TagId],
   postings: [

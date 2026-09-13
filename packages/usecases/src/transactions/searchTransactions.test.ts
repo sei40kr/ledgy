@@ -17,7 +17,6 @@ function transaction(overrides: Partial<Transaction>): Transaction {
     updatedBy: "u1" as UserId,
     updatedAt: null,
     date: new Date("2026-01-10"),
-    description: "文房具購入",
     partners: ["p-kokuyo" as PartnerId],
     tags: [],
     system: null,
@@ -46,9 +45,9 @@ function transaction(overrides: Partial<Transaction>): Transaction {
 }
 
 describe("matchesKeyword", () => {
-  it("matches a substring of the description or a posting memo", () => {
-    expect(matchesKeyword(transaction({}), "文房具")).toBe(true);
+  it("matches a substring of a posting memo", () => {
     expect(matchesKeyword(transaction({}), "ボールペン")).toBe(true);
+    expect(matchesKeyword(transaction({}), "ペン")).toBe(true);
     expect(matchesKeyword(transaction({}), "存在しない")).toBe(false);
   });
 

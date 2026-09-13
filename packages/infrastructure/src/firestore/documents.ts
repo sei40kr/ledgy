@@ -86,7 +86,6 @@ export interface TransactionDocument {
   updatedAt: Timestamp;
   currentRevision: string;
   date: Timestamp;
-  description: string;
   partners: string[];
   tags: string[];
   postings: PostingDocument[];
@@ -102,7 +101,6 @@ export interface TransactionRevisionDocument {
   createdBy: string;
   createdAt: Timestamp;
   date: Timestamp;
-  description: string;
   partners: string[];
   tags: string[];
   postings: PostingDocument[];

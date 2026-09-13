@@ -42,6 +42,7 @@ function posting(
   side: PostingSide,
   accountTitleId: string,
   amount: number,
+  memo = "",
 ): Posting {
   return {
     side,
@@ -49,7 +50,7 @@ function posting(
     subAccountTitleId: null,
     amount: new MonetaryAmount(amount),
     taxCategory: null,
-    memo: "",
+    memo,
   };
 }
 
@@ -127,10 +128,9 @@ describe("transactions integration (real emulator, real Security Rules)", () => 
       createdBy: uid,
       draft: {
         date: new Date("2026-01-10"),
-        description: "売上入金",
         partners: [],
         tags: [],
-        postings: [posting("debit", "cash", 10000), posting("credit", "sales", 10000)],
+        postings: [posting("debit", "cash", 10000, "売上入金"), posting("credit", "sales", 10000)],
       },
     });
     const second = await transactions.create({
@@ -139,11 +139,10 @@ describe("transactions integration (real emulator, real Security Rules)", () => 
       createdBy: uid,
       draft: {
         date: new Date("2026-01-20"),
-        description: "消耗品購入",
         partners: [],
         tags: [],
         postings: [
-          posting("debit", "supplies", 3000),
+          posting("debit", "supplies", 3000, "消耗品購入"),
           posting("credit", "cash", 3000),
         ],
       },
@@ -176,10 +175,9 @@ describe("transactions integration (real emulator, real Security Rules)", () => 
         createdBy: uid,
         draft: {
           date: new Date("2026-02-01"),
-          description: "不一致",
           partners: [],
           tags: [],
-          postings: [posting("debit", "cash", 1000), posting("credit", "sales", 999)],
+          postings: [posting("debit", "cash", 1000, "不一致"), posting("credit", "sales", 999)],
         },
       }),
     ).rejects.toThrow(TransactionUnbalancedError);
@@ -196,10 +194,9 @@ describe("transactions integration (real emulator, real Security Rules)", () => 
         createdBy: uid,
         draft: {
           date: new Date("2027-01-01"),
-          description: "期間外",
           partners: [],
           tags: [],
-          postings: [posting("debit", "cash", 100), posting("credit", "sales", 100)],
+          postings: [posting("debit", "cash", 100, "期間外"), posting("credit", "sales", 100)],
         },
       }),
     ).rejects.toThrow(DateOutsideFiscalYearError);
@@ -213,10 +210,9 @@ describe("transactions integration (real emulator, real Security Rules)", () => 
       createdBy: uid,
       draft: {
         date: new Date("2026-03-05"),
-        description: "旅費",
         partners: [],
         tags: [],
-        postings: [posting("debit", "travel", 5000), posting("credit", "cash", 5000)],
+        postings: [posting("debit", "travel", 5000, "旅費"), posting("credit", "cash", 5000)],
       },
     });
 
@@ -227,10 +223,9 @@ describe("transactions integration (real emulator, real Security Rules)", () => 
       updatedBy: uid,
       draft: {
         date: new Date("2026-04-05"), // moves the transaction into another month
-        description: "旅費(修正)",
         partners: [],
         tags: [],
-        postings: [posting("debit", "travel", 7000), posting("credit", "cash", 7000)],
+        postings: [posting("debit", "travel", 7000, "旅費(修正)"), posting("credit", "cash", 7000)],
       },
     });
 
@@ -241,14 +236,14 @@ describe("transactions integration (real emulator, real Security Rules)", () => 
 
     const transaction = await getTransaction(transactionId);
     expect(transaction?.updatedBy).toBe(uid);
-    expect(transaction?.description).toBe("旅費(修正)");
+    expect(transaction?.postings[0]?.memo).toBe("旅費(修正)");
 
     const revisions = await listRevisions(transactionId);
     expect(revisions).toHaveLength(2);
     // each revision holds that version's full content, not a diff; ordered by createdAt
-    expect(revisions[0]?.description).toBe("旅費");
+    expect(revisions[0]?.postings[0]?.memo).toBe("旅費");
     expect(revisions[0]?.postings[0]?.amount).toBe(5000);
-    expect(revisions[1]?.description).toBe("旅費(修正)");
+    expect(revisions[1]?.postings[0]?.memo).toBe("旅費(修正)");
     expect(revisions[1]?.postings[0]?.amount).toBe(7000);
   });
 
@@ -260,7 +255,6 @@ describe("transactions integration (real emulator, real Security Rules)", () => 
       createdBy: uid,
       draft: {
         date: new Date("2026-05-01"),
-        description: "削除対象",
         partners: [],
         tags: [],
         postings: [posting("debit", "misc", 2000), posting("credit", "cash", 2000)],
@@ -289,10 +283,9 @@ describe("transactions integration (real emulator, real Security Rules)", () => 
         updatedBy: uid,
         draft: {
           date: new Date("2026-05-01"),
-          description: "復活",
           partners: [],
           tags: [],
-          postings: [posting("debit", "misc", 1), posting("credit", "cash", 1)],
+          postings: [posting("debit", "misc", 1, "復活"), posting("credit", "cash", 1)],
         },
       }),
     ).rejects.toThrow(TransactionDeletedError);
@@ -303,10 +296,9 @@ describe("transactions integration (real emulator, real Security Rules)", () => 
 
     const draft = {
       date: new Date("2026-06-01"),
-      description: "原子性検証",
       partners: [],
       tags: [],
-      postings: [posting("debit", "cash", 100), posting("credit", "sales", 100)],
+      postings: [posting("debit", "cash", 100, "原子性検証"), posting("credit", "sales", 100)],
     };
 
     const before = await transactions.create({

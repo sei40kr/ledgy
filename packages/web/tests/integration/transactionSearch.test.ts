@@ -29,6 +29,7 @@ function posting(
   side: PostingSide,
   accountTitleId: string,
   amount: number,
+  memo = "",
 ): Posting {
   return {
     side,
@@ -36,7 +37,7 @@ function posting(
     subAccountTitleId: null,
     amount: new MonetaryAmount(amount),
     taxCategory: null,
-    memo: "",
+    memo,
   };
 }
 
@@ -74,10 +75,9 @@ beforeAll(async () => {
     createdBy: tenantId as string as UserId,
     draft: {
       date: new Date("2026-01-05"),
-      description: "現金売上",
       partners: [],
       tags: [],
-      postings: [posting("debit", "cash", 1000), posting("credit", "sales", 1000)],
+      postings: [posting("debit", "cash", 1000, "現金売上"), posting("credit", "sales", 1000)],
     },
   });
   await u.transactions.create({
@@ -86,10 +86,9 @@ beforeAll(async () => {
     createdBy: tenantId as string as UserId,
     draft: {
       date: new Date("2026-01-20"),
-      description: "掛売上",
       partners: [],
       tags: [],
-      postings: [posting("debit", "receivable", 2000), posting("credit", "sales", 2000)],
+      postings: [posting("debit", "receivable", 2000, "掛売上"), posting("credit", "sales", 2000)],
     },
   });
   await u.transactions.create({
@@ -98,10 +97,9 @@ beforeAll(async () => {
     createdBy: tenantId as string as UserId,
     draft: {
       date: new Date("2026-02-10"),
-      description: "経費支払",
       partners: [],
       tags: [],
-      postings: [posting("debit", "expense", 500), posting("credit", "cash", 500)],
+      postings: [posting("debit", "expense", 500, "経費支払"), posting("credit", "cash", 500)],
     },
   });
   const deleted = await u.transactions.create({
@@ -110,10 +108,9 @@ beforeAll(async () => {
     createdBy: tenantId as string as UserId,
     draft: {
       date: new Date("2026-02-15"),
-      description: "削除される仕訳",
       partners: [],
       tags: [],
-      postings: [posting("debit", "expense", 100), posting("credit", "cash", 100)],
+      postings: [posting("debit", "expense", 100, "削除される仕訳"), posting("credit", "cash", 100)],
     },
   });
   deletedTransactionId = deleted.transactionId;
@@ -136,7 +133,7 @@ describe("transaction search integration", () => {
       yearId,
       limit: 50,
     });
-    expect(page.transactions.map((e) => e.description)).toEqual([
+    expect(page.transactions.map((e) => e.postings[0]?.memo)).toEqual([
       "経費支払",
       "掛売上",
       "現金売上",
@@ -162,20 +159,20 @@ describe("transaction search integration", () => {
       accountTitleId: "cash" as AccountTitleId,
       limit: 50,
     });
-    expect(page.transactions.map((e) => e.description).sort()).toEqual([
+    expect(page.transactions.map((e) => e.postings[0]?.memo).sort()).toEqual([
       "現金売上",
       "経費支払",
     ]);
   });
 
-  it("filters by keyword over the description", async () => {
+  it("filters by keyword over the posting memos", async () => {
     const page = await usecases().transactions.search({
       tenantId,
       yearId,
       keyword: "掛売上",
       limit: 50,
     });
-    expect(page.transactions.map((e) => e.description)).toEqual(["掛売上"]);
+    expect(page.transactions.map((e) => e.postings[0]?.memo)).toEqual(["掛売上"]);
   });
 
   it("includes deleted transactions when includeDeleted is set", async () => {

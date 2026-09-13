@@ -35,23 +35,30 @@ let tenantId: TenantId;
 let yearId: FiscalYearId;
 let uid: UserId;
 
-function posting(side: PostingSide, accountTitleId: string, amount: number): Posting {
+function posting(
+  side: PostingSide,
+  accountTitleId: string,
+  amount: number,
+  memo = "",
+): Posting {
   return {
     side,
     accountTitleId: accountTitleId as AccountTitleId,
     subAccountTitleId: null,
     amount: new MonetaryAmount(amount),
     taxCategory: null,
-    memo: "",
+    memo,
   };
 }
 
 const draft = {
   date: new Date("2026-03-05"),
-  description: "証憑付きの仕訳",
   partners: [],
   tags: [],
-  postings: [posting("debit", "supplies", 2500), posting("credit", "cash", 2500)],
+  postings: [
+    posting("debit", "supplies", 2500, "証憑付きの仕訳"),
+    posting("credit", "cash", 2500),
+  ],
 };
 
 function pdfFile(name = "supportingDocument.pdf") {
@@ -192,7 +199,13 @@ describe("supportingDocuments integration (real emulators, real Security Rules)"
       yearId,
       transactionId,
       updatedBy: uid,
-      draft: { ...draft, description: "摘要だけ変更" },
+      draft: {
+        ...draft,
+        postings: [
+          posting("debit", "supplies", 2500, "摘要だけ変更"),
+          posting("credit", "cash", 2500),
+        ],
+      },
     });
     expect((await getTransaction(transactionId))?.supportingDocumentIds).toEqual([supportingDocumentId]);
 
@@ -203,7 +216,7 @@ describe("supportingDocuments integration (real emulators, real Security Rules)"
 
     const revisions = await listRevisions(transactionId);
     expect(revisions.map((r) => r.supportingDocumentIds)).toEqual([[], [supportingDocumentId], [supportingDocumentId], []]);
-    expect(revisions.map((r) => r.description)).toEqual([
+    expect(revisions.map((r) => r.postings[0]?.memo)).toEqual([
       "証憑付きの仕訳",
       "証憑付きの仕訳",
       "摘要だけ変更",

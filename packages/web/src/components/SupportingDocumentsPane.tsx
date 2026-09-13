@@ -12,16 +12,12 @@ import {
  * The sticky right-hand column that holds the supporting documents next to a
  * transaction form, with 拡大表示 opening the same panel as a large dialog.
  */
-export function SupportingDocumentsPane({
-  description,
-  ...panel
-}: Omit<
-  TransactionSupportingDocumentsPanelProps,
-  "layout" | "previewHeight" | "onEnlarge"
-> & {
-  /** The transaction's description, for the dialog title. */
-  description: string;
-}) {
+export function SupportingDocumentsPane(
+  panel: Omit<
+    TransactionSupportingDocumentsPanelProps,
+    "layout" | "previewHeight" | "onEnlarge"
+  >,
+) {
   const [enlarged, setEnlarged] = useState(false);
   return (
     <Box
@@ -43,7 +39,6 @@ export function SupportingDocumentsPane({
       {enlarged && (
         <TransactionSupportingDocumentsDialog
           {...panel}
-          description={description}
           onClose={() => setEnlarged(false)}
         />
       )}

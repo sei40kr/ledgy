@@ -51,7 +51,6 @@ type TestFirestore = ReturnType<RulesTestContext["firestore"]>;
 function content(overrides: Fields = {}): Fields {
   return {
     date: new Date("2026-01-10"),
-    description: "テスト仕訳",
     partners: [],
     tags: [],
     postings: [
@@ -305,7 +304,7 @@ describe("Security Rules tying the header to its revision", () => {
 
   it("rejects a header whose content differs from the revision it links to", async () => {
     const db = testEnv.authenticatedContext("alice").firestore();
-    await assertFails(createVersion(db, { header: { description: "帳簿には別の文言" } }));
+    await assertFails(createVersion(db, { header: { tags: ["帳簿には別のタグ"] } }));
     const otherPostings = [
       { side: "debit", accountTitleId: "cash", subAccountTitleId: null, amount: 1000, taxCategory: null, memo: "" },
       { side: "credit", accountTitleId: "other", subAccountTitleId: null, amount: 1000, taxCategory: null, memo: "" },
@@ -334,7 +333,7 @@ describe("Security Rules tying the header to its revision", () => {
     const db = testEnv.authenticatedContext("alice").firestore();
     await assertFails(
       updateDoc(doc(db, transactionDocPath("e1")), {
-        description: "改変",
+        tags: ["改変"],
         updatedBy: "alice",
         updatedAt: serverTimestamp(),
       }),
@@ -363,10 +362,10 @@ describe("Security Rules for updating and deleting transactions", () => {
   it("allows an update by the caller, soft deletes included", async () => {
     const db = testEnv.authenticatedContext("alice").firestore();
     await assertSucceeds(
-      updateVersion(db, { revisionId: "rev2", content: { description: "修正" } }),
+      updateVersion(db, { revisionId: "rev2", content: { tags: ["修正"] } }),
     );
     await assertSucceeds(
-      updateVersion(db, { revisionId: "rev3", content: { description: "修正", deleted: true } }),
+      updateVersion(db, { revisionId: "rev3", content: { tags: ["修正"], deleted: true } }),
     );
   });
 
@@ -388,7 +387,7 @@ describe("Security Rules for updating and deleting transactions", () => {
       updateVersion(db, {
         transactionId: "e2",
         yearId: "closed-year",
-        content: { date: new Date("2025-01-10"), description: "締切後の改変" },
+        content: { date: new Date("2025-01-10"), tags: ["締切後の改変"] },
       }),
     );
   });
@@ -407,7 +406,7 @@ describe("Security Rules for a transaction's revisions, which keep history tampe
     // Overwriting an existing revision doc counts as an update, so a written
     // version can never be replaced.
     await assertFails(
-      setDoc(doc(db, revisionDocPath("e1", "rev1")), revision({ description: "改竄" })),
+      setDoc(doc(db, revisionDocPath("e1", "rev1")), revision({ tags: ["改竄"] })),
     );
     await assertFails(updateDoc(doc(db, revisionDocPath("e1", "rev1")), { deleted: true }));
     await assertFails(deleteDoc(doc(db, revisionDocPath("e1", "rev1"))));

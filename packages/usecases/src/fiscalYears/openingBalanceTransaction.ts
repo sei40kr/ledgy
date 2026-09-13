@@ -11,7 +11,6 @@ import type { OpeningBalance } from "./openingBalance";
  * per fiscal year, stored under a deterministic document id so saving overwrites it.
  */
 export const OPENING_BALANCE_TRANSACTION_ID = "opening-balance";
-export const OPENING_BALANCE_DESCRIPTION = "期首残高";
 
 /**
  * Converts opening balances to the postings of the opening transaction: each

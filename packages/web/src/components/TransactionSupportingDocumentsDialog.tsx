@@ -14,15 +14,12 @@ import {
  * preview themselves.
  */
 export function TransactionSupportingDocumentsDialog({
-  description,
   onClose,
   ...panel
 }: Omit<
   TransactionSupportingDocumentsPanelProps,
   "layout" | "previewHeight" | "onEnlarge"
 > & {
-  /** The transaction's description, for the title. */
-  description: string;
   onClose(): void;
 }) {
   return (
@@ -32,7 +29,7 @@ export function TransactionSupportingDocumentsDialog({
         <Dialog.Positioner>
           <Dialog.Content h="88vh" maxH="88vh">
             <Dialog.Header>
-              <Dialog.Title>{description || "(摘要なし)"}の証憑</Dialog.Title>
+              <Dialog.Title>証憑</Dialog.Title>
             </Dialog.Header>
             <Dialog.Body flex={1} minH={0} overflow="hidden">
               <TransactionSupportingDocumentsPanel {...panel} layout="split" />

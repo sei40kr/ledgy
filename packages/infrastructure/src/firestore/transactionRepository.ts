@@ -39,7 +39,6 @@ import type {
   UserId,
 } from "@account-ledgers/domain";
 import {
-  OPENING_BALANCE_DESCRIPTION,
   OPENING_BALANCE_TRANSACTION_ID,
   openingBalanceToPostings,
   postingsToOpeningBalance,
@@ -84,7 +83,6 @@ const transactionConverter: FirestoreDataConverter<Transaction> = {
       createdBy: transaction.createdBy,
       updatedBy: transaction.updatedBy,
       date: transaction.date,
-      description: transaction.description,
       partners: transaction.partners,
       tags: transaction.tags,
       system: transaction.system,
@@ -106,7 +104,6 @@ const transactionConverter: FirestoreDataConverter<Transaction> = {
       updatedBy: d.updatedBy as UserId,
       updatedAt: d.updatedAt?.toDate() ?? null,
       date: d.date.toDate(),
-      description: d.description,
       partners: (d.partners ?? []) as PartnerId[],
       tags: (d.tags ?? []) as TagId[],
       system: (d.system ?? null) as SystemTransactionKind | null,
@@ -123,7 +120,6 @@ const transactionRevisionConverter: FirestoreDataConverter<TransactionRevision> 
     return {
       createdBy: revision.createdBy,
       date: revision.date,
-      description: revision.description,
       partners: revision.partners,
       tags: revision.tags,
       system: revision.system,
@@ -143,7 +139,6 @@ const transactionRevisionConverter: FirestoreDataConverter<TransactionRevision> 
       createdBy: d.createdBy as UserId,
       createdAt: d.createdAt?.toDate() ?? null,
       date: d.date.toDate(),
-      description: d.description,
       partners: (d.partners ?? []) as PartnerId[],
       tags: (d.tags ?? []) as TagId[],
       system: (d.system ?? null) as SystemTransactionKind | null,
@@ -262,7 +257,6 @@ export function createFirestoreTransactionRepository(
         // --- writes ---
         const content = {
           date: draft.date,
-          description: draft.description,
           partners: draft.partners,
           tags: draft.tags,
           system: null,
@@ -339,7 +333,6 @@ export function createFirestoreTransactionRepository(
         // --- writes ---
         const content = {
           date: draft.date,
-          description: draft.description,
           partners: draft.partners,
           tags: draft.tags,
           system: null,
@@ -606,7 +599,6 @@ export function createFirestoreTransactionRepository(
 
         const content = {
           date,
-          description: OPENING_BALANCE_DESCRIPTION,
           partners: [] as PartnerId[],
           tags: [] as TagId[],
           system: "openingBalance" as const,
@@ -646,7 +638,6 @@ type StoredContent = Omit<
 function contentOf(current: DocumentData): StoredContent {
   return {
     date: current.date.toDate(),
-    description: current.description,
     partners: (current.partners ?? []) as PartnerId[],
     tags: (current.tags ?? []) as TagId[],
     system: (current.system ?? null) as SystemTransactionKind | null,

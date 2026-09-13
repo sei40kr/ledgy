@@ -166,7 +166,6 @@ function EditTransactionContent() {
             yearId={currentYear.id}
             transactionId={transaction.id}
             userId={user.uid as UserId}
-            description={transaction.description}
             disabled={closed || transaction.deleted}
           />
         )}
@@ -185,13 +184,11 @@ function EditTransactionSupportingDocuments(props: {
   yearId: FiscalYearId;
   transactionId: TransactionId;
   userId: UserId;
-  description: string;
   disabled: boolean;
 }) {
   const { supportingDocuments, attach, remove } = useTransactionSupportingDocuments(props);
   return (
     <SupportingDocumentsPane
-      description={props.description}
       tenantId={props.tenantId}
       uploadedBy={props.userId}
       supportingDocuments={supportingDocuments}

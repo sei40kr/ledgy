@@ -186,7 +186,6 @@ service cloud.firestore {
           // The content of one version, carried by the header and by every revision.
           function validContent(d) {
             return d.date is timestamp && withinYear(d.date)
-              && d.description is string
               && d.partners is list
               && d.tags is list
               && d.postings is list
@@ -206,7 +205,6 @@ service cloud.firestore {
               && !exists(revisionPath(d.currentRevision))
               && existsAfter(revisionPath(d.currentRevision))
               && getAfter(revisionPath(d.currentRevision)).data.date == d.date
-              && getAfter(revisionPath(d.currentRevision)).data.description == d.description
               && getAfter(revisionPath(d.currentRevision)).data.partners == d.partners
               && getAfter(revisionPath(d.currentRevision)).data.tags == d.tags
               && getAfter(revisionPath(d.currentRevision)).data.postings == d.postings

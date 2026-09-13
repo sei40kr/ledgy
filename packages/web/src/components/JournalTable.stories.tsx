@@ -68,7 +68,6 @@ function posting(
 function transaction(
   id: string,
   date: string,
-  description: string,
   postings: Posting[],
   extra: Partial<
     Pick<Transaction, "partners" | "tags" | "supportingDocumentIds" | "deleted">
@@ -82,7 +81,6 @@ function transaction(
     updatedBy: user,
     updatedAt: createdAt,
     date: new Date(date),
-    description,
     partners: extra.partners ?? [],
     tags: extra.tags ?? [],
     postings,
@@ -97,7 +95,6 @@ const transactions: Transaction[] = [
   transaction(
     "transaction-1",
     "2026-05-10",
-    "文房具購入",
     [
       posting("debit", "消耗品費", 3300, {
         taxCategory: new TaxCategory("taxablePurchase10"),
@@ -114,7 +111,6 @@ const transactions: Transaction[] = [
   transaction(
     "transaction-2",
     "2026-05-12",
-    "出張費精算",
     [
       posting("debit", "旅費交通費", 28600, {
         taxCategory: new TaxCategory("taxablePurchase10"),
@@ -130,7 +126,6 @@ const transactions: Transaction[] = [
   transaction(
     "transaction-3",
     "2026-05-15",
-    "5月分請求",
     [
       posting("debit", "売掛金", 110000),
       posting("credit", "売上高", 100000, {
@@ -144,7 +139,6 @@ const transactions: Transaction[] = [
   transaction(
     "transaction-4",
     "2026-05-18",
-    "二重計上の取消",
     [
       posting("debit", "消耗品費", 3300),
       posting("credit", "普通預金", 3300),

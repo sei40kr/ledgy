@@ -187,7 +187,7 @@ function TransactionRow({
   transaction: Transaction;
   insetX: BoxProps["px"];
 }) {
-  const { deleted, description, partners, tags } = transaction;
+  const { deleted, partners, tags } = transaction;
 
   const accountTitleCell = (posting: Posting | null) => {
     if (!posting) return null;
@@ -220,7 +220,7 @@ function TransactionRow({
       </Text>
     ) : null;
 
-  const hasCaption = description !== "" || partners.length > 0 || tags.length > 0;
+  const hasBadges = partners.length > 0 || tags.length > 0;
 
   return (
     <RowFrame
@@ -274,9 +274,8 @@ function TransactionRow({
           />
         </Flex>
       ))}
-      {hasCaption && (
+      {hasBadges && (
         <Flex {...CELL_PADDING} pt={0} gap={2} align="center" flexWrap="wrap">
-          {description !== "" && <Text>{description}</Text>}
           {partners.map((id) => (
             <EntityBadge key={id} icon={<PartnerIcon boxSize="11px" />}>
               {partnerNameById.get(id) ?? id}

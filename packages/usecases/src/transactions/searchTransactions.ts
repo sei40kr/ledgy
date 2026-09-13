@@ -6,10 +6,11 @@ import type {
 } from "../ports/transactionRepository";
 
 /**
- * Substring keyword match against the description and posting memos. Partners are
- * now id references rather than names, so they are not matched here; resolving
- * partner names for search is a presentation-layer concern. Firestore has no
- * full-text search, so this runs over an already-fetched page.
+ * Substring keyword match against the posting memos, which is where a
+ * transaction's free text lives. Partners are id references rather than names,
+ * so they are not matched here; resolving partner names for search is a
+ * presentation-layer concern. Firestore has no full-text search, so this runs
+ * over an already-fetched page.
  */
 export function matchesKeyword(
   transaction: Transaction,
@@ -17,11 +18,7 @@ export function matchesKeyword(
 ): boolean {
   const needle = keyword.trim();
   if (!needle) return true;
-  const { description, postings } = transaction;
-  return (
-    description.includes(needle) ||
-    postings.some((posting) => posting.memo.includes(needle))
-  );
+  return transaction.postings.some((posting) => posting.memo.includes(needle));
 }
 
 /** Search. Only the keyword is filtered client-side after fetching, a Firestore limitation. */

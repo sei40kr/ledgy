@@ -335,7 +335,7 @@ function MonthDetail({
                       fiscalYear,
                     )}
                   </Table.Cell>
-                  <Table.Cell>{transaction.description}</Table.Cell>
+                  <Table.Cell>{posting.memo}</Table.Cell>
                   <Table.Cell>
                     <HStack gap={1} flexWrap="wrap">
                       {counterparts.map((account) => (

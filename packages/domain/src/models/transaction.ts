@@ -50,7 +50,6 @@ export interface TransactionRevision {
   createdAt: Date | null;
   /** Calendar date normalized to UTC midnight. */
   date: Date;
-  description: string;
   partners: PartnerId[];
   tags: TagId[];
   postings: Posting[];
@@ -77,7 +76,6 @@ export interface Transaction {
   updatedAt: Date | null;
   /** Calendar date normalized to UTC midnight. */
   date: Date;
-  description: string;
   partners: PartnerId[];
   tags: TagId[];
   postings: Posting[];

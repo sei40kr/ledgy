@@ -72,7 +72,6 @@ function supportingDocument(overrides: Fields = {}): Fields {
 function content(overrides: Fields = {}): Fields {
   return {
     date: new Date("2026-01-10"),
-    description: "テスト仕訳",
     partners: [],
     tags: [],
     postings: [
