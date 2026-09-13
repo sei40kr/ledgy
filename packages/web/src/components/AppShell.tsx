@@ -244,34 +244,8 @@ function AppShellInner({ children, flush }: Required<AppShellProps>) {
         h="100vh"
         overflowY="auto"
       >
-        {/* Brand */}
-        <HStack gap="10px" px={5} pt="18px" pb={4}>
-          <Flex
-            w="26px"
-            h="26px"
-            rounded="sm"
-            bg="fg"
-            color="bg.panel"
-            align="center"
-            justify="center"
-            fontSize="13px"
-            fontWeight="bold"
-            flexShrink={0}
-          >
-            帳
-          </Flex>
-          <Stack gap={0} lineHeight="1.2" minW={0}>
-            <Text fontSize="14px" fontWeight="semibold" letterSpacing="-0.01em">
-              kaicho
-            </Text>
-            <Text fontSize="10.5px" color="fg.subtle">
-              open source bookkeeping
-            </Text>
-          </Stack>
-        </HStack>
-
         {/* Primary action */}
-        <Box px="14px" pb="6px">
+        <Box px="14px" pt="18px" pb="6px">
           {currentYear ? (
             <Button asChild w="full" h="36px" size="sm" fontWeight="medium">
               <NextLink
