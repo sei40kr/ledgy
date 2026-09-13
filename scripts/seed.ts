@@ -24,6 +24,7 @@ import {
   type PostingSide,
   STANDARD_ACCOUNT_TITLE_PRESETS,
   type SupportingDocumentId,
+  type TagId,
   type TenantId,
   type UserId,
 } from "@account-ledgers/domain";
@@ -32,6 +33,8 @@ import { listAccountTitlesUseCase } from "@account-ledgers/usecases";
 import { updateAccountTitleUseCase } from "@account-ledgers/usecases";
 import { createPartnerUseCase } from "@account-ledgers/usecases";
 import { listPartnersUseCase } from "@account-ledgers/usecases";
+import { createTagUseCase } from "@account-ledgers/usecases";
+import { listTagsUseCase } from "@account-ledgers/usecases";
 import { createFiscalYearUseCase } from "@account-ledgers/usecases";
 import { listFiscalYearsUseCase } from "@account-ledgers/usecases";
 import { saveOpeningBalanceUseCase } from "@account-ledgers/usecases";
@@ -44,6 +47,7 @@ import { uploadSupportingDocumentUseCase } from "@account-ledgers/usecases";
 import { createFirebaseAuthAdapter } from "@account-ledgers/infrastructure/auth/firebaseAuthAdapter";
 import { createFirestoreAccountTitleRepository } from "@account-ledgers/infrastructure/firestore/accountTitleRepository";
 import { createFirestorePartnerRepository } from "@account-ledgers/infrastructure/firestore/partnerRepository";
+import { createFirestoreTagRepository } from "@account-ledgers/infrastructure/firestore/tagRepository";
 import { createFirestoreFiscalYearRepository } from "@account-ledgers/infrastructure/firestore/fiscalYearRepository";
 import { createFirestoreTransactionRepository } from "@account-ledgers/infrastructure/firestore/transactionRepository";
 import { DEMO_ACCOUNT } from "@account-ledgers/infrastructure/firebase/devAccount";
@@ -90,6 +94,10 @@ const usecases = {
   partners: {
     list: listPartnersUseCase({ partners: createFirestorePartnerRepository(db) }),
     create: createPartnerUseCase({ partners: createFirestorePartnerRepository(db) }),
+  },
+  tags: {
+    list: listTagsUseCase({ tags: createFirestoreTagRepository(db) }),
+    create: createTagUseCase({ tags: createFirestoreTagRepository(db) }),
   },
   fiscalYears: {
     list: listFiscalYearsUseCase({ fiscalYears: fiscalYearRepository }),
@@ -202,6 +210,7 @@ async function main() {
     date: Date;
     description: string;
     partners: string[];
+    tags: string[];
     postings: Posting[];
     /** File names under scripts/supporting-documents to upload and attach. */
     supportingDocuments?: string[];
@@ -214,6 +223,7 @@ async function main() {
         date: new Date(`${year}-${mm}-05`),
         description: "売上(掛)",
         partners: ["株式会社サンプル商事"],
+        tags: ["売上"],
         postings: [
           posting("debit", acc("売掛金"), salesAmount),
           posting("credit", acc("売上高"), salesAmount),
@@ -223,6 +233,7 @@ async function main() {
         date: new Date(`${year}-${mm}-10`),
         description: "売掛金回収",
         partners: ["株式会社サンプル商事"],
+        tags: ["売上", "入金"],
         postings: [
           posting("debit", acc("普通預金"), salesAmount),
           posting("credit", acc("売掛金"), salesAmount),
@@ -232,6 +243,7 @@ async function main() {
         date: new Date(`${year}-${mm}-25`),
         description: "地代家賃の支払",
         partners: ["○○不動産"],
+        tags: ["固定費"],
         postings: [
           posting("debit", acc("地代家賃"), 110_000),
           posting("credit", acc("普通預金"), 110_000),
@@ -242,6 +254,7 @@ async function main() {
         date: new Date(`${year}-${mm}-15`),
         description: "通信費・水道光熱費の支払(複合仕訳)",
         partners: [],
+        tags: ["固定費"],
         postings: [
           posting("debit", acc("通信費"), 8_800, "携帯電話"),
           posting("debit", acc("水道光熱費"), 12_000 + month * 500, "電気代"),
@@ -253,6 +266,7 @@ async function main() {
         date: new Date(`${year}-${mm}-20`),
         description: "消耗品購入(現金)",
         partners: ["文具店"],
+        tags: ["事務用品"],
         postings: [
           posting("debit", acc("消耗品費"), 3_000 + month * 200),
           posting("credit", acc("現金"), 3_000 + month * 200),
@@ -267,6 +281,7 @@ async function main() {
     date: new Date(`${year}-06-20`),
     description: "タクシー代",
     partners: [],
+    tags: ["交通費"],
     postings: [
       posting("debit", acc("旅費交通費"), 2_340),
       posting("credit", acc("現金"), 2_340),
@@ -279,6 +294,7 @@ async function main() {
     date: new Date(`${year}-03-28`),
     description: "各種経費のまとめ払い(複合仕訳)",
     partners: ["文具店", "○○不動産"],
+    tags: ["事務用品", "固定費"],
     postings: [
       posting("debit", acc("消耗品費"), 30_000, "文房具・備品"),
       posting("debit", acc("通信費"), 8_800, "通信費"),
@@ -411,7 +427,26 @@ async function main() {
       return id;
     });
 
-  // 8. The transactions, each attached to its documents as it is created.
+  // 8. The tags the sample transactions carry, resolved the same way.
+  const tagNames = [...new Set(drafts.flatMap((d) => d.tags))];
+  const existingTags = await usecases.tags.list(tenantId);
+  const tagIdByName = new Map(existingTags.map((t) => [t.name, t.id]));
+  for (const name of tagNames) {
+    if (!tagIdByName.has(name)) {
+      tagIdByName.set(
+        name,
+        await usecases.tags.create({ tenantId, name, searchWords: [] }),
+      );
+    }
+  }
+  const tagIds = (names: string[]): TagId[] =>
+    names.map((name) => {
+      const id = tagIdByName.get(name);
+      if (!id) throw new Error(`Tag ${name} not found`);
+      return id;
+    });
+
+  // 9. The transactions, each attached to its documents as it is created.
   let count = 0;
   let documentCount = 0;
   for (const { supportingDocuments, ...draft } of drafts) {
@@ -420,7 +455,11 @@ async function main() {
       tenantId,
       yearId,
       createdBy: tenantId as string as UserId,
-      draft: { ...draft, partners: partnerIds(draft.partners), tags: [] },
+      draft: {
+        ...draft,
+        partners: partnerIds(draft.partners),
+        tags: tagIds(draft.tags),
+      },
       supportingDocumentIds,
     });
     count++;
