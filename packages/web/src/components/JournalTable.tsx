@@ -407,7 +407,9 @@ function SupportingDocumentIndicator({
   return (
     <Button
       size="2xs"
-      variant={count > 0 ? "subtle" : "outline"}
+      // One outline whatever the count: the filled variant used to blend into
+      // the row's own hover tint, which is where the button is read from.
+      variant="outline"
       aria-label={label}
       title={label}
       textDecoration="none"
