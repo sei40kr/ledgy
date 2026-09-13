@@ -25,6 +25,8 @@ import {
   STANDARD_ACCOUNT_TITLE_PRESETS,
   type SupportingDocumentId,
   type TagId,
+  TaxCategory,
+  type TaxCategoryCode,
   type TenantId,
   type UserId,
 } from "@account-ledgers/domain";
@@ -137,15 +139,17 @@ function posting(
   side: PostingSide,
   accountTitleId: AccountTitleId,
   amount: number,
-  memo: string = "",
+  extra: { memo?: string; taxCategory?: TaxCategoryCode } = {},
 ): Posting {
   return {
     side,
     accountTitleId,
     subAccountTitleId: null,
     amount: new MonetaryAmount(amount),
-    taxCategory: null,
-    memo,
+    // Only the posting that carries the consumption tax is classified; the
+    // cash and receivable sides of an entry are out of scope and stay blank.
+    taxCategory: extra.taxCategory ? new TaxCategory(extra.taxCategory) : null,
+    memo: extra.memo ?? "",
   };
 }
 
@@ -226,7 +230,9 @@ async function main() {
         tags: ["売上"],
         postings: [
           posting("debit", acc("売掛金"), salesAmount),
-          posting("credit", acc("売上高"), salesAmount),
+          posting("credit", acc("売上高"), salesAmount, {
+            taxCategory: "taxableSales10",
+          }),
         ],
       },
       {
@@ -245,7 +251,9 @@ async function main() {
         partners: ["○○不動産"],
         tags: ["固定費"],
         postings: [
-          posting("debit", acc("地代家賃"), 110_000),
+          posting("debit", acc("地代家賃"), 110_000, {
+            taxCategory: "taxablePurchase10",
+          }),
           posting("credit", acc("普通預金"), 110_000),
         ],
         supportingDocuments: month === 3 ? ["invoice-rent.pdf"] : undefined,
@@ -256,8 +264,14 @@ async function main() {
         partners: [],
         tags: ["固定費"],
         postings: [
-          posting("debit", acc("通信費"), 8_800, "携帯電話"),
-          posting("debit", acc("水道光熱費"), 12_000 + month * 500, "電気代"),
+          posting("debit", acc("通信費"), 8_800, {
+            memo: "携帯電話",
+            taxCategory: "taxablePurchase10",
+          }),
+          posting("debit", acc("水道光熱費"), 12_000 + month * 500, {
+            memo: "電気代",
+            taxCategory: "taxablePurchase10",
+          }),
           posting("credit", acc("普通預金"), 20_800 + month * 500),
         ],
         supportingDocuments: month === 2 ? ["receipt-mobile.pdf"] : undefined,
@@ -268,7 +282,9 @@ async function main() {
         partners: ["文具店"],
         tags: ["事務用品"],
         postings: [
-          posting("debit", acc("消耗品費"), 3_000 + month * 200),
+          posting("debit", acc("消耗品費"), 3_000 + month * 200, {
+            taxCategory: "taxablePurchase10",
+          }),
           posting("credit", acc("現金"), 3_000 + month * 200),
         ],
         supportingDocuments: month === 4 ? ["receipt-stationery.pdf"] : undefined,
@@ -283,7 +299,9 @@ async function main() {
     partners: [],
     tags: ["交通費"],
     postings: [
-      posting("debit", acc("旅費交通費"), 2_340),
+      posting("debit", acc("旅費交通費"), 2_340, {
+        taxCategory: "taxablePurchase10",
+      }),
       posting("credit", acc("現金"), 2_340),
     ],
     supportingDocuments: ["receipt-taxi.png"],
@@ -296,11 +314,20 @@ async function main() {
     partners: ["文具店", "○○不動産"],
     tags: ["事務用品", "固定費"],
     postings: [
-      posting("debit", acc("消耗品費"), 30_000, "文房具・備品"),
-      posting("debit", acc("通信費"), 8_800, "通信費"),
-      posting("debit", acc("水道光熱費"), 12_000, "水道光熱費"),
-      posting("credit", acc("普通預金"), 40_000, "普通預金より"),
-      posting("credit", acc("現金"), 10_800, "現金より"),
+      posting("debit", acc("消耗品費"), 30_000, {
+        memo: "文房具・備品",
+        taxCategory: "taxablePurchase10",
+      }),
+      posting("debit", acc("通信費"), 8_800, {
+        memo: "通信費",
+        taxCategory: "taxablePurchase10",
+      }),
+      posting("debit", acc("水道光熱費"), 12_000, {
+        memo: "水道光熱費",
+        taxCategory: "taxablePurchase10",
+      }),
+      posting("credit", acc("普通預金"), 40_000, { memo: "普通預金より" }),
+      posting("credit", acc("現金"), 10_800, { memo: "現金より" }),
     ],
     // One document per expense: a transaction may carry several.
     supportingDocuments: [
