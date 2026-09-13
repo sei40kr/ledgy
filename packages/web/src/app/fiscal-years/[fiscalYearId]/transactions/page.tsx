@@ -220,6 +220,7 @@ function TransactionsContent() {
           onOpen={(transaction) => router.push(editHref(transaction.id))}
           onOpenSupportingDocuments={setSupportingDocumentsOf}
           stickyHeadingTop={APP_SHELL_HEADER_HEIGHT}
+          insetX={6}
         />
       </Box>
 

@@ -6,13 +6,24 @@ import type {
   Posting,
   Transaction,
 } from "@account-ledgers/domain";
-import { Box, Button, Flex, type FlexProps, Stack, Text } from "@chakra-ui/react";
+import {
+  Badge,
+  Box,
+  type BoxProps,
+  Button,
+  Flex,
+  type FlexProps,
+  Stack,
+  Text,
+} from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { AccountTitleBadge } from "@/components/AccountTitleBadge";
 import { formatDateInFiscalYear } from "@/components/dates";
 import { FileIcon } from "@/components/FileIcon";
 import { TAX_CATEGORY_LABELS } from "@/components/labels";
 import { MonetaryAmountText } from "@/components/MonetaryAmountText";
+import { PartnerIcon } from "@/components/PartnerIcon";
+import { TagIcon } from "@/components/TagIcon";
 
 export interface JournalTableProps {
   transactions: Transaction[];
@@ -31,6 +42,12 @@ export interface JournalTableProps {
    * needs every ancestor to leave `overflow` visible.
    */
   stickyHeadingTop?: string;
+  /**
+   * Padding outside the first and the last column, so the text lines up with
+   * whatever the container puts above the table. Defaults to the padding of a
+   * panel card's own header.
+   */
+  insetX?: BoxProps["px"];
 }
 
 // The column widths shared by the heading and every transaction row. The table
@@ -39,21 +56,32 @@ export interface JournalTableProps {
 // heading) are what keep the nested cells aligned with the column headings. The
 // fixed cells also drop the automatic min-width, so oversized content overflows
 // its cell instead of pushing the other columns out of line.
-const DATE_WIDTH = "7rem";
-const AMOUNT_WIDTH = "8rem";
+const DATE_WIDTH = "6.5rem";
+const AMOUNT_WIDTH = "7.5rem";
 const SUPPORTING_DOCUMENTS_WIDTH = "5.5rem";
-// The lines take three parts of the flexible width and the description one.
-const LINES_GROW = 3;
-const DESCRIPTION_GROW = 1;
+// Inside one side (debit or credit), the account title takes this much of the
+// flexible width and the memo one; the amount is fixed.
+const ACCOUNT_TITLE_GROW = 1.4;
+const MEMO_GROW = 1;
 
 const CELL_PADDING = { px: 3, py: 3 } as const;
+const HEADING_CELL_PADDING = { px: 3, py: 2 } as const;
+const DEFAULT_INSET_X = 5;
+
+// Only the heading is ruled into its column groups — 日付 | 借方 | 貸方 | 証憑.
+// Every rule lives on the left edge of the group it opens, and both heading tiers
+// apply it, which is what keeps them on one vertical line. The body rows are left
+// unruled so the lines of one transaction read as a single block.
+const HEADING_DIVIDER = { borderLeftWidth: "1px", borderColor: "border" } as const;
 
 /**
  * The journal (仕訳帳): one row per transaction. A transaction's date,
- * description, and supporting documents belong to the whole transaction and
- * span all of its lines; the lines pair the debit postings with the credit
- * postings positionally, the way a paper journal does. Deleted transactions are
- * struck through and tinted rather than flagged in a status column.
+ * supporting documents, description, and partner / tag badges belong to the
+ * whole transaction and span all of its lines; the lines pair the debit
+ * postings with the credit postings positionally, the way a paper journal does,
+ * each side carrying its own account title, amount, and memo. Deleted
+ * transactions are struck through and tinted rather than flagged in a status
+ * column.
  */
 export function JournalTable({
   transactions,
@@ -64,29 +92,11 @@ export function JournalTable({
   onOpen,
   onOpenSupportingDocuments,
   stickyHeadingTop,
+  insetX = DEFAULT_INSET_X,
 }: JournalTableProps) {
   return (
     <Box textStyle="sm" css={{ fontVariantNumeric: "lining-nums tabular-nums" }}>
-      <JournalRow
-        position={stickyHeadingTop === undefined ? undefined : "sticky"}
-        top={stickyHeadingTop}
-        zIndex={stickyHeadingTop === undefined ? undefined : 1}
-        bg="bg.subtle"
-        fontWeight="medium"
-        borderBottomWidth="1px"
-        borderColor="border"
-        date="日付"
-        lines={[
-          {
-            debitAccountTitle: "借方科目",
-            debitAmount: "借方金額",
-            creditAccountTitle: "貸方科目",
-            creditAmount: "貸方金額",
-          },
-        ]}
-        description="摘要 / 取引先"
-        supportingDocuments="証憑"
-      />
+      <JournalHeading insetX={insetX} stickyTop={stickyHeadingTop} />
       {transactions.map((transaction) => (
         <TransactionRow
           key={transaction.id}
@@ -97,9 +107,70 @@ export function JournalTable({
           tagNameById={tagNameById}
           onOpen={onOpen}
           onOpenSupportingDocuments={onOpenSupportingDocuments}
+          insetX={insetX}
         />
       ))}
     </Box>
+  );
+}
+
+/**
+ * The column headings, in two tiers: 借方 and 貸方 each span the three columns
+ * of their side, which the tier below names. The date and the supporting
+ * documents head both tiers at once.
+ */
+function JournalHeading({
+  insetX,
+  stickyTop,
+}: {
+  insetX: BoxProps["px"];
+  stickyTop: string | undefined;
+}) {
+  return (
+    <RowFrame
+      insetX={insetX}
+      position={stickyTop === undefined ? undefined : "sticky"}
+      top={stickyTop}
+      zIndex={stickyTop === undefined ? undefined : 1}
+      bg="bg.subtle"
+      fontWeight="medium"
+      borderBottomWidth="1px"
+      borderColor="border"
+      dateAlign="center"
+      divided
+      date="日付"
+      supportingDocuments="証憑"
+    >
+      <Flex borderBottomWidth="1px" borderColor="border" color="fg.muted">
+        <Box flex="1 1 0" minW={0} {...HEADING_CELL_PADDING} textAlign="center">
+          借方
+        </Box>
+        <Box
+          flex="1 1 0"
+          minW={0}
+          {...HEADING_CELL_PADDING}
+          {...HEADING_DIVIDER}
+          textAlign="center"
+        >
+          貸方
+        </Box>
+      </Flex>
+      <Flex>
+        <SideCells
+          padding={HEADING_CELL_PADDING}
+          accountTitle="科目"
+          amount="金額"
+          memo="摘要"
+        />
+        <SideCells
+          divided
+          padding={HEADING_CELL_PADDING}
+          accountTitle="科目"
+          amount="金額"
+          memo="摘要"
+        />
+      </Flex>
+    </RowFrame>
   );
 }
 
@@ -111,39 +182,49 @@ function TransactionRow({
   tagNameById,
   onOpen,
   onOpenSupportingDocuments,
-}: Omit<JournalTableProps, "transactions" | "stickyHeadingTop"> & {
+  insetX,
+}: Omit<JournalTableProps, "transactions" | "stickyHeadingTop" | "insetX"> & {
   transaction: Transaction;
+  insetX: BoxProps["px"];
 }) {
-  const { deleted } = transaction;
+  const { deleted, description, partners, tags } = transaction;
 
   const accountTitleCell = (posting: Posting | null) => {
     if (!posting) return null;
     const accountTitle = accountTitleById.get(posting.accountTitleId);
-    return (
-      <Stack gap={0.5} align="flex-start">
-        {accountTitle ? (
-          <AccountTitleBadge name={accountTitle.name} category={accountTitle.category} />
-        ) : (
-          posting.accountTitleId
-        )}
+    return accountTitle ? (
+      <AccountTitleBadge name={accountTitle.name} category={accountTitle.category} />
+    ) : (
+      posting.accountTitleId
+    );
+  };
+  // The tax category sits under the amount it applies to, where the rate reads
+  // as an annotation of the figure rather than of the account title.
+  const amountCell = (posting: Posting | null) =>
+    posting && (
+      <Stack gap={0.5} align="flex-end">
+        <Text as="span" fontFamily="mono">
+          <MonetaryAmountText value={posting.amount.value} />
+        </Text>
         {posting.taxCategory && (
-          <Text fontSize="10px" color="fg.muted">
-            {TAX_CATEGORY_LABELS[posting.taxCategory.code]}
-          </Text>
-        )}
-        {posting.memo && (
           <Text fontSize="xs" color="fg.muted">
-            {posting.memo}
+            {TAX_CATEGORY_LABELS[posting.taxCategory.code]}
           </Text>
         )}
       </Stack>
     );
-  };
-  const amountCell = (posting: Posting | null) =>
-    posting ? <MonetaryAmountText value={posting.amount.value} /> : null;
+  const memoCell = (posting: Posting | null) =>
+    posting?.memo ? (
+      <Text color="fg.muted" wordBreak="break-word">
+        {posting.memo}
+      </Text>
+    ) : null;
+
+  const hasCaption = description !== "" || partners.length > 0 || tags.length > 0;
 
   return (
-    <JournalRow
+    <RowFrame
+      insetX={insetX}
       aria-label={deleted ? "取消済の仕訳" : undefined}
       onClick={() => !deleted && onOpen(transaction)}
       cursor={deleted ? "default" : "pointer"}
@@ -172,119 +253,138 @@ function TransactionRow({
           {formatDateInFiscalYear(transaction.date, fiscalYear)}
         </Text>
       }
-      lines={pairPostings(transaction.postings).map((line) => ({
-        debitAccountTitle: accountTitleCell(line.debit),
-        debitAmount: amountCell(line.debit),
-        creditAccountTitle: accountTitleCell(line.credit),
-        creditAmount: amountCell(line.credit),
-      }))}
-      description={
-        <>
-          {transaction.description}
-          {transaction.partners.length > 0 && (
-            <Text as="span" fontSize="xs" color="fg.muted">
-              {" "}
-              /{" "}
-              {transaction.partners
-                .map((id) => partnerNameById.get(id) ?? id)
-                .join("、")}
-            </Text>
-          )}
-          {transaction.tags.length > 0 && (
-            <Text as="span" fontSize="xs" color="fg.info">
-              {" "}
-              {transaction.tags
-                .map((id) => `#${tagNameById.get(id) ?? id}`)
-                .join(" ")}
-            </Text>
-          )}
-        </>
-      }
       supportingDocuments={
         <SupportingDocumentIndicator
           count={transaction.supportingDocumentIds.length}
           onClick={() => onOpenSupportingDocuments(transaction)}
         />
       }
-    />
+    >
+      {pairPostings(transaction.postings).map((line, i) => (
+        <Flex key={i}>
+          <SideCells
+            accountTitle={accountTitleCell(line.debit)}
+            amount={amountCell(line.debit)}
+            memo={memoCell(line.debit)}
+          />
+          <SideCells
+            accountTitle={accountTitleCell(line.credit)}
+            amount={amountCell(line.credit)}
+            memo={memoCell(line.credit)}
+          />
+        </Flex>
+      ))}
+      {hasCaption && (
+        <Flex {...CELL_PADDING} pt={0} gap={2} align="center" flexWrap="wrap">
+          {description !== "" && <Text>{description}</Text>}
+          {partners.map((id) => (
+            <EntityBadge key={id} icon={<PartnerIcon boxSize="11px" />}>
+              {partnerNameById.get(id) ?? id}
+            </EntityBadge>
+          ))}
+          {tags.map((id) => (
+            <EntityBadge key={id} icon={<TagIcon boxSize="11px" />}>
+              {tagNameById.get(id) ?? id}
+            </EntityBadge>
+          ))}
+        </Flex>
+      )}
+    </RowFrame>
   );
-}
-
-/** The cells of one line of the nested table: a debit posting beside a credit posting. */
-interface LineSlots {
-  debitAccountTitle: ReactNode;
-  debitAmount: ReactNode;
-  creditAccountTitle: ReactNode;
-  creditAmount: ReactNode;
 }
 
 /**
  * One row of the journal, laid out identically whether it holds the column
- * headings or a transaction: the transaction-level cells (date, description,
- * supporting documents) beside a nested table with one line per posting pair.
- * The supporting documents are centered vertically so they visibly belong to
- * every line at once.
+ * headings or a transaction: the transaction-level cells (date, supporting
+ * documents) on the outside, and whatever spans every line in between. The
+ * supporting documents are centered vertically so they visibly belong to every
+ * line at once.
  */
-function JournalRow({
+function RowFrame({
   date,
-  lines,
-  description,
   supportingDocuments,
+  insetX,
+  dateAlign = "flex-start",
+  divided = false,
+  children,
   ...rowProps
 }: {
   date: ReactNode;
-  lines: LineSlots[];
-  description: ReactNode;
   supportingDocuments: ReactNode;
+  insetX: BoxProps["px"];
+  dateAlign?: FlexProps["align"];
+  /** Rules the row into its column groups. The heading alone is ruled. */
+  divided?: boolean;
+  children: ReactNode;
 } & Omit<FlexProps, "children">) {
   return (
     <Flex align="stretch" {...rowProps}>
-      <Box flex={`0 0 ${DATE_WIDTH}`} minW={0} {...CELL_PADDING} whiteSpace="nowrap">
+      <Flex
+        flex={`0 0 ${DATE_WIDTH}`}
+        minW={0}
+        {...CELL_PADDING}
+        pl={insetX}
+        align={dateAlign}
+        whiteSpace="nowrap"
+        {...(divided && { borderRightWidth: "1px", borderColor: "border" })}
+      >
         {date}
-      </Box>
-      <Stack flex={`${LINES_GROW} 1 0`} minW={0} gap={0}>
-        {lines.map((line, i) => (
-          <Flex key={i}>
-            <Box flex="1 1 0" minW={0} {...CELL_PADDING}>
-              {line.debitAccountTitle}
-            </Box>
-            <Box
-              flex={`0 0 ${AMOUNT_WIDTH}`}
-              minW={0}
-              {...CELL_PADDING}
-              textAlign="right"
-              fontFamily="mono"
-            >
-              {line.debitAmount}
-            </Box>
-            <Box flex="1 1 0" minW={0} {...CELL_PADDING}>
-              {line.creditAccountTitle}
-            </Box>
-            <Box
-              flex={`0 0 ${AMOUNT_WIDTH}`}
-              minW={0}
-              {...CELL_PADDING}
-              textAlign="right"
-              fontFamily="mono"
-            >
-              {line.creditAmount}
-            </Box>
-          </Flex>
-        ))}
+      </Flex>
+      <Stack flex="1 1 0" minW={0} gap={0}>
+        {children}
       </Stack>
-      <Box flex={`${DESCRIPTION_GROW} 1 0`} minW="10rem" {...CELL_PADDING}>
-        {description}
-      </Box>
       <Flex
         flex={`0 0 ${SUPPORTING_DOCUMENTS_WIDTH}`}
         minW={0}
         {...CELL_PADDING}
+        pr={insetX}
         align="center"
         justify="center"
+        {...(divided && HEADING_DIVIDER)}
       >
         {supportingDocuments}
       </Flex>
     </Flex>
+  );
+}
+
+/** The three cells of one side of a line — or of the tier that heads them. */
+function SideCells({
+  accountTitle,
+  amount,
+  memo,
+  divided = false,
+  padding = CELL_PADDING,
+}: {
+  accountTitle: ReactNode;
+  amount: ReactNode;
+  memo: ReactNode;
+  /** Opens the side with a rule. The heading alone is ruled. */
+  divided?: boolean;
+  padding?: Pick<BoxProps, "px" | "py">;
+}) {
+  return (
+    <Flex flex="1 1 0" minW={0} {...(divided && HEADING_DIVIDER)}>
+      <Box flex={`${ACCOUNT_TITLE_GROW} 1 0`} minW={0} {...padding}>
+        {accountTitle}
+      </Box>
+      <Box flex={`0 0 ${AMOUNT_WIDTH}`} minW={0} {...padding} textAlign="right">
+        {amount}
+      </Box>
+      <Box flex={`${MEMO_GROW} 1 0`} minW={0} {...padding}>
+        {memo}
+      </Box>
+    </Flex>
+  );
+}
+
+/** A partner or a tag of the transaction, told apart by its icon. */
+function EntityBadge({ icon, children }: { icon: ReactNode; children: ReactNode }) {
+  return (
+    <Badge variant="outline" size="sm" gap={1} color="fg.muted">
+      {icon}
+      {children}
+    </Badge>
   );
 }
 
