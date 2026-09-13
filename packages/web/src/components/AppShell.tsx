@@ -352,7 +352,9 @@ function AppShellInner({ children, flush }: Required<AppShellProps>) {
               {subtitle}
             </Text>
           </Stack>
-          <HStack ml="auto" gap={2}>
+          {/* The year picker, the avatar and the sign-out each read as their
+              own control, so they sit further apart than the parts of one. */}
+          <HStack ml="auto" gap={4}>
             {years.length > 0 && (
               <HStack
                 gap={2}
