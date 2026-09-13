@@ -11,7 +11,6 @@ import {
   Box,
   Field,
   HStack,
-  NativeSelect,
   Spinner,
   Stack,
   Table,
@@ -26,6 +25,7 @@ import { AccountTitleBadge } from "@/components/AccountTitleBadge";
 import { AppShell } from "@/components/AppShell";
 import { FiscalYearRequired } from "@/components/FiscalYearRequired";
 import { MonetaryAmountText } from "@/components/MonetaryAmountText";
+import { SearchableSelect } from "@/components/SearchableSelect";
 import { TableCard } from "@/components/TableCard";
 import { formatDateInFiscalYear } from "@/components/dates";
 import { useAccountTitles } from "@/hooks/useAccountTitles";
@@ -61,6 +61,10 @@ function GeneralLedgerContent() {
   );
   const accountById = useMemo(
     () => new Map(accountTitles.map((a) => [a.id, a])),
+    [accountTitles],
+  );
+  const activeAccountTitles = useMemo(
+    () => accountTitles.filter((a) => a.isActive),
     [accountTitles],
   );
 
@@ -130,23 +134,12 @@ function GeneralLedgerContent() {
     <Stack gap={4}>
       <Field.Root maxW="20rem">
         <Field.Label>勘定科目</Field.Label>
-        <NativeSelect.Root size="sm">
-          <NativeSelect.Field
-            value={accountTitleId}
-            onChange={(e) => setAccountId(e.target.value)}
-            bg="bg.panel"
-          >
-            <option value="">科目を選択してください</option>
-            {accountTitles
-              .filter((a) => a.isActive)
-              .map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
-          </NativeSelect.Field>
-          <NativeSelect.Indicator />
-        </NativeSelect.Root>
+        <SearchableSelect
+          items={activeAccountTitles}
+          value={accountTitleId}
+          onChange={setAccountId}
+          placeholder="科目を検索"
+        />
       </Field.Root>
 
       {error && (
