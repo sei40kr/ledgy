@@ -103,7 +103,7 @@ function RecentTransactions() {
         <Text fontSize="13.5px" fontWeight="semibold">
           最近の取引
         </Text>
-        <Link asChild ml="auto" fontSize="12.5px" color="fg.info">
+        <Link asChild ml="auto" fontSize="sm" color="fg.info">
           <NextLink href={`/fiscal-years/${currentYear.id}/transactions/`}>
             仕訳帳をすべて見る
           </NextLink>
