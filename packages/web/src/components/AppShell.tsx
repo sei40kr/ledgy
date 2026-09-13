@@ -382,7 +382,6 @@ function AppShellInner({ children, flush }: Required<AppShellProps>) {
                     aria-label="会計年度"
                     value={currentYear?.id ?? ""}
                     onChange={(e) => selectYear(e.target.value || null)}
-                    fontSize="12.5px"
                     px={0}
                   >
                     <option value="">未選択</option>
