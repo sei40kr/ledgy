@@ -136,7 +136,6 @@ function JournalHeading({
       fontWeight="medium"
       borderBottomWidth="1px"
       borderColor="border"
-      dateAlign="center"
       divided
       date="日付"
       supportingDocuments="証憑"
@@ -299,15 +298,13 @@ function TransactionRow({
 /**
  * One row of the journal, laid out identically whether it holds the column
  * headings or a transaction: the transaction-level cells (date, supporting
- * documents) on the outside, and whatever spans every line in between. The
- * supporting documents are centered vertically so they visibly belong to every
- * line at once.
+ * documents) on the outside, and whatever spans every line in between. Both are
+ * centered vertically so they visibly belong to every line at once.
  */
 function RowFrame({
   date,
   supportingDocuments,
   insetX,
-  dateAlign = "flex-start",
   divided = false,
   children,
   ...rowProps
@@ -315,7 +312,6 @@ function RowFrame({
   date: ReactNode;
   supportingDocuments: ReactNode;
   insetX: BoxProps["px"];
-  dateAlign?: FlexProps["align"];
   /** Rules the row into its column groups. The heading alone is ruled. */
   divided?: boolean;
   children: ReactNode;
@@ -327,7 +323,7 @@ function RowFrame({
         minW={0}
         {...CELL_PADDING}
         pl={insetX}
-        align={dateAlign}
+        align="center"
         whiteSpace="nowrap"
         {...(divided && { borderRightWidth: "1px", borderColor: "border" })}
       >
