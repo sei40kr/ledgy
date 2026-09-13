@@ -58,7 +58,7 @@ export interface JournalTableProps {
 // its cell instead of pushing the other columns out of line.
 const DATE_WIDTH = "6.5rem";
 const AMOUNT_WIDTH = "7.5rem";
-const SUPPORTING_DOCUMENTS_WIDTH = "5.5rem";
+const SUPPORTING_DOCUMENTS_WIDTH = "6.5rem";
 // Inside one side (debit or credit), the account title takes this much of the
 // flexible width and the memo one; the amount is fixed.
 const ACCOUNT_TITLE_GROW = 1.4;
@@ -393,8 +393,8 @@ function EntityBadge({ icon, children }: { icon: ReactNode; children: ReactNode 
 
 /**
  * Whether a transaction has supporting documents, and how many, at a glance;
- * clicking opens them. With none yet it reads as the action to add one, so it
- * still looks clickable. Stops the click so the row does not open the transaction.
+ * clicking opens them, which is where one is attached. Stops the click so the
+ * row does not open the transaction.
  */
 function SupportingDocumentIndicator({
   count,
@@ -403,7 +403,7 @@ function SupportingDocumentIndicator({
   count: number;
   onClick(): void;
 }) {
-  const label = count > 0 ? `証憑 ${count}件` : "証憑を追加";
+  const label = count > 0 ? `証憑 ${count}件` : "証憑 未添付";
   return (
     <Button
       size="2xs"
@@ -419,7 +419,7 @@ function SupportingDocumentIndicator({
       }}
     >
       <FileIcon boxSize="12px" />
-      {count > 0 ? count : "追加"}
+      {count > 0 ? count : "未添付"}
     </Button>
   );
 }
