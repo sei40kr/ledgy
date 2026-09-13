@@ -193,7 +193,11 @@ function TransactionRow({
     if (!posting) return null;
     const accountTitle = accountTitleById.get(posting.accountTitleId);
     return accountTitle ? (
-      <AccountTitleBadge name={accountTitle.name} category={accountTitle.category} />
+      <AccountTitleBadge
+        name={accountTitle.name}
+        category={accountTitle.category}
+        size="md"
+      />
     ) : (
       posting.accountTitleId
     );
@@ -380,7 +384,7 @@ function SideCells({
 /** A partner or a tag of the transaction, told apart by its icon. */
 function EntityBadge({ icon, children }: { icon: ReactNode; children: ReactNode }) {
   return (
-    <Badge variant="outline" size="sm" gap={1} color="fg.muted">
+    <Badge variant="outline" size="md" gap={1} color="fg.muted">
       {icon}
       {children}
     </Badge>
