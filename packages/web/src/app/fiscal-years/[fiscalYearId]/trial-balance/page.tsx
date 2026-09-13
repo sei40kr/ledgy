@@ -12,13 +12,13 @@ import {
   Spinner,
   Stack,
   Table,
-  Text,
 } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { TrialBalance, TrialBalanceMode } from "@account-ledgers/usecases";
 import { AccountTitleBadge } from "@/components/AccountTitleBadge";
 import { AppShell } from "@/components/AppShell";
 import { CategoryBadge } from "@/components/CategoryBadge";
+import { FiscalYearRequired } from "@/components/FiscalYearRequired";
 import { MonetaryAmountText } from "@/components/MonetaryAmountText";
 import { TableCard } from "@/components/TableCard";
 import { useAccountTitles } from "@/hooks/useAccountTitles";
@@ -117,11 +117,7 @@ function TrialBalanceContent() {
   }
 
   if (!currentYear) {
-    return (
-      <Text fontSize="sm" color="fg.muted">
-        会計年度がまだありません。「会計年度」から年度を作成してください。
-      </Text>
-    );
+    return <FiscalYearRequired />;
   }
 
   // Sort the rows by the account title master's sortOrder.

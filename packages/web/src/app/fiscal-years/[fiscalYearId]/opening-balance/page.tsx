@@ -20,6 +20,7 @@ import { useForm } from "react-hook-form";
 import { AccountTitleBadge } from "@/components/AccountTitleBadge";
 import { AppShell } from "@/components/AppShell";
 import { CategoryBadge } from "@/components/CategoryBadge";
+import { FiscalYearRequired } from "@/components/FiscalYearRequired";
 import { MonetaryAmountText } from "@/components/MonetaryAmountText";
 import {
   MonetaryAmountInput,
@@ -141,11 +142,7 @@ function OpeningBalanceContent() {
   });
 
   if (!currentYear) {
-    return (
-      <Text fontSize="sm" color="fg.muted">
-        先に会計年度を作成してください。
-      </Text>
-    );
+    return <FiscalYearRequired />;
   }
 
   return (

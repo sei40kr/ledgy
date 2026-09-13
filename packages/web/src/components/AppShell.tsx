@@ -7,14 +7,17 @@ import {
   HStack,
   Link,
   NativeSelect,
+  Portal,
   Spinner,
   Stack,
   Text,
+  Tooltip,
 } from "@chakra-ui/react";
 import NextLink from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { usecases } from "@account-ledgers/infrastructure/container";
+import { FISCAL_YEAR_REQUIRED_HINT } from "@/components/FiscalYearRequired";
 import { useAuth } from "@/hooks/useAuth";
 import {
   fiscalYearLabel,
@@ -23,10 +26,16 @@ import {
 } from "@/hooks/useFiscalYears";
 
 // Items with `sub` are scoped to a fiscal year and resolve to
-// `/fiscal-years/<id><sub>`; items with `href` are tenant-wide.
+// `/fiscal-years/<id><sub>`; items with `href` are tenant-wide, and
+// `requiresYear` marks the ones that still have nothing to show without a
+// selected year. Everything that needs a year is disabled while none is.
 type NavItem =
   | { sub: string; label: string }
-  | { href: string; label: string };
+  | { href: string; label: string; requiresYear?: boolean };
+
+function requiresFiscalYear(item: NavItem): boolean {
+  return "sub" in item || item.requiresYear === true;
+}
 
 interface NavGroup {
   heading?: string;
@@ -34,7 +43,7 @@ interface NavGroup {
 }
 
 const NAV_GROUPS: NavGroup[] = [
-  { items: [{ href: "/", label: "ホーム" }] },
+  { items: [{ href: "/", label: "ホーム", requiresYear: true }] },
   {
     heading: "記録する",
     items: [{ sub: "/transactions/", label: "仕訳帳" }],
@@ -128,6 +137,71 @@ export function AppShell({ children, flush = false }: AppShellProps) {
   );
 }
 
+/** Layout shared by an enabled and a disabled sidebar entry. */
+const NAV_ENTRY_STYLES = {
+  display: "flex",
+  alignItems: "center",
+  gap: "9px",
+  w: "full",
+  px: "10px",
+  py: "7px",
+  rounded: "md",
+  fontSize: "13.5px",
+} as const;
+
+function NavEntryBody({ label, active }: { label: string; active: boolean }) {
+  return (
+    <>
+      <Box
+        as="span"
+        w="3px"
+        h="14px"
+        rounded="2px"
+        bg={active ? "fg" : "transparent"}
+        flexShrink={0}
+      />
+      <Text
+        as="span"
+        flex={1}
+        overflow="hidden"
+        textOverflow="ellipsis"
+        whiteSpace="nowrap"
+      >
+        {label}
+      </Text>
+    </>
+  );
+}
+
+/** Explains on hover why the control it wraps is out of reach. */
+function FiscalYearRequiredTooltip({
+  children,
+}: {
+  children: React.ReactElement;
+}) {
+  return (
+    <Tooltip.Root
+      openDelay={200}
+      closeDelay={80}
+      // The trigger ends inside the sidebar, so clear its border before the
+      // arrow, which is what ties the bubble back to the row it explains.
+      positioning={{ placement: "right", offset: { mainAxis: 20 } }}
+    >
+      <Tooltip.Trigger asChild>{children}</Tooltip.Trigger>
+      <Portal>
+        <Tooltip.Positioner>
+          <Tooltip.Content fontSize="12px">
+            <Tooltip.Arrow>
+              <Tooltip.ArrowTip />
+            </Tooltip.Arrow>
+            {FISCAL_YEAR_REQUIRED_HINT}
+          </Tooltip.Content>
+        </Tooltip.Positioner>
+      </Portal>
+    </Tooltip.Root>
+  );
+}
+
 function AppShellInner({ children, flush }: Required<AppShellProps>) {
   const { user } = useAuth();
   const router = useRouter();
@@ -139,22 +213,17 @@ function AppShellInner({ children, flush }: Required<AppShellProps>) {
     router.replace("/login");
   }
 
-  // Resolve a nav item to its concrete href; year-scoped items fall back to the
-  // fiscal-year management page until a year exists.
+  // Resolve a nav item to its concrete href. Only ever called for an item that
+  // is enabled, so a year-scoped one always has a year to scope to.
   function resolveHref(item: NavItem): string {
-    if ("href" in item) return item.href;
-    return currentYear
-      ? `/fiscal-years/${currentYear.id}${item.sub}`
-      : "/fiscal-years/";
+    return "href" in item
+      ? item.href
+      : `/fiscal-years/${currentYear?.id}${item.sub}`;
   }
-
-  const newTransactionHref = currentYear
-    ? `/fiscal-years/${currentYear.id}${NEW_TRANSACTION_SUB}`
-    : "/fiscal-years/";
 
   const scopedSubtitle = currentYear
     ? fiscalYearLabel(currentYear)
-    : "会計年度が未設定です";
+    : "会計年度が未選択です";
   const { title, subtitle } = pageMeta(pathname, scopedSubtitle);
 
   const avatarChar = (user?.email ?? "?").charAt(0).toUpperCase();
@@ -203,9 +272,24 @@ function AppShellInner({ children, flush }: Required<AppShellProps>) {
 
         {/* Primary action */}
         <Box px="14px" pb="6px">
-          <Button asChild w="full" h="36px" size="sm" fontWeight="medium">
-            <NextLink href={newTransactionHref}>＋ 仕訳を追加</NextLink>
-          </Button>
+          {currentYear ? (
+            <Button asChild w="full" h="36px" size="sm" fontWeight="medium">
+              <NextLink
+                href={`/fiscal-years/${currentYear.id}${NEW_TRANSACTION_SUB}`}
+              >
+                ＋ 仕訳を追加
+              </NextLink>
+            </Button>
+          ) : (
+            <FiscalYearRequiredTooltip>
+              {/* A disabled button swallows hover, so the wrapper carries it. */}
+              <Box w="full">
+                <Button w="full" h="36px" size="sm" fontWeight="medium" disabled>
+                  ＋ 仕訳を追加
+                </Button>
+              </Box>
+            </FiscalYearRequiredTooltip>
+          )}
         </Box>
 
         {/* Grouped navigation */}
@@ -226,43 +310,35 @@ function AppShellInner({ children, flush }: Required<AppShellProps>) {
                 </Text>
               )}
               {group.items.map((item) => {
+                if (!currentYear && requiresFiscalYear(item)) {
+                  return (
+                    <FiscalYearRequiredTooltip key={item.label}>
+                      <Flex
+                        {...NAV_ENTRY_STYLES}
+                        color="fg.subtle"
+                        opacity={0.6}
+                        cursor="not-allowed"
+                        aria-disabled="true"
+                      >
+                        <NavEntryBody label={item.label} active={false} />
+                      </Flex>
+                    </FiscalYearRequiredTooltip>
+                  );
+                }
                 const href = resolveHref(item);
                 const active = pathname === href;
                 return (
                   <Link
                     key={item.label}
                     asChild
-                    display="flex"
-                    alignItems="center"
-                    gap="9px"
-                    w="full"
-                    px="10px"
-                    py="7px"
-                    rounded="md"
-                    fontSize="13.5px"
+                    {...NAV_ENTRY_STYLES}
                     fontWeight={active ? "semibold" : "normal"}
                     color={active ? "fg" : "fg.muted"}
                     transition="background 150ms"
                     _hover={{ bg: "bg.muted", textDecor: "none" }}
                   >
                     <NextLink href={href}>
-                      <Box
-                        as="span"
-                        w="3px"
-                        h="14px"
-                        rounded="2px"
-                        bg={active ? "fg" : "transparent"}
-                        flexShrink={0}
-                      />
-                      <Text
-                        as="span"
-                        flex={1}
-                        overflow="hidden"
-                        textOverflow="ellipsis"
-                        whiteSpace="nowrap"
-                      >
-                        {item.label}
-                      </Text>
+                      <NavEntryBody label={item.label} active={active} />
                     </NextLink>
                   </Link>
                 );
@@ -331,10 +407,11 @@ function AppShellInner({ children, flush }: Required<AppShellProps>) {
                   <NativeSelect.Field
                     aria-label="会計年度"
                     value={currentYear?.id ?? ""}
-                    onChange={(e) => selectYear(e.target.value)}
+                    onChange={(e) => selectYear(e.target.value || null)}
                     fontSize="12.5px"
                     px={0}
                   >
+                    <option value="">未選択</option>
                     {years.map((year) => (
                       <option key={year.id} value={year.id}>
                         {fiscalYearLabel(year)}

@@ -1,11 +1,11 @@
 "use client";
 
 import type { SupportingDocument, UserId } from "@account-ledgers/domain";
-import { Alert, Box, Flex, Link, Spinner, Stack, Text } from "@chakra-ui/react";
-import NextLink from "next/link";
+import { Alert, Box, Flex, Spinner, Stack } from "@chakra-ui/react";
 import { useState } from "react";
 import type { TransactionDraft } from "@account-ledgers/usecases";
 import { AppShell } from "@/components/AppShell";
+import { FiscalYearRequired } from "@/components/FiscalYearRequired";
 import { TransactionForm } from "@/components/TransactionForm";
 import { SupportingDocumentsPane } from "@/components/SupportingDocumentsPane";
 import { useAccountTitles } from "@/hooks/useAccountTitles";
@@ -34,15 +34,7 @@ function NewTransactionContent() {
   if (!tenantId) return null;
 
   if (!currentYear) {
-    return (
-      <Text fontSize="sm">
-        会計年度がまだありません。
-        <Link asChild color="fg.info">
-          <NextLink href="/fiscal-years/">会計年度</NextLink>
-        </Link>
-        から年度を作成してください。
-      </Text>
-    );
+    return <FiscalYearRequired />;
   }
 
   async function handleSubmit(draft: TransactionDraft) {

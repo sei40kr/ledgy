@@ -16,9 +16,10 @@ import { useAuth } from "./useAuth";
 interface FiscalYearState {
   years: FiscalYear[];
   loading: boolean;
-  /** The currently selected fiscal year. Null when nothing is selected or no year exists. */
+  /** The currently selected fiscal year. Null while none is selected. */
   currentYear: FiscalYear | null;
-  selectYear(yearId: string): void;
+  /** Selects a fiscal year, or clears the selection when given null. */
+  selectYear(yearId: string | null): void;
   reload(): Promise<void>;
 }
 
@@ -71,21 +72,27 @@ export function FiscalYearProvider({
   }, [reload]);
 
   // On a `/fiscal-years/<id>/...` route the URL is the source of truth;
-  // elsewhere (home, settings) fall back to the last selection or an open year.
+  // elsewhere (home, settings) the last explicit selection stands. Nothing is
+  // selected until the user picks a year, and an ID that names no existing
+  // year counts as no selection.
   const routeYearId = fiscalYearIdFromPath(pathname);
   const currentYear =
-    years.find((y) => y.id === routeYearId) ??
-    years.find((y) => y.id === selectedId) ??
-    years.find((y) => y.status === "open") ??
-    years[0] ??
-    null;
+    years.find((y) => y.id === (routeYearId ?? selectedId)) ?? null;
 
   const selectYear = useCallback(
-    (yearId: string) => {
+    (yearId: string | null) => {
       setSelectedId(yearId);
-      localStorage.setItem(STORAGE_KEY, yearId);
-      const target = rewriteFiscalYearPath(pathname, yearId);
-      if (target) router.push(target);
+      if (yearId) localStorage.setItem(STORAGE_KEY, yearId);
+      else localStorage.removeItem(STORAGE_KEY);
+
+      const scopedPath = yearId ? rewriteFiscalYearPath(pathname, yearId) : null;
+      if (scopedPath) {
+        router.push(scopedPath);
+      } else if (fiscalYearIdFromPath(pathname)) {
+        // Clearing the selection from a year-scoped route: its URL would keep
+        // pinning the year we just cleared, so leave the route behind.
+        router.push("/fiscal-years/");
+      }
     },
     [pathname, router],
   );

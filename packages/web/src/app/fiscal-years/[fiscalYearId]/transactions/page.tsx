@@ -22,6 +22,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { APP_SHELL_HEADER_HEIGHT, AppShell } from "@/components/AppShell";
 import { DateField } from "@/components/DateField";
+import { FiscalYearRequired } from "@/components/FiscalYearRequired";
 import { JournalSupportingDocumentsDialog } from "@/components/JournalSupportingDocumentsDialog";
 import { JournalTable } from "@/components/JournalTable";
 import { formatDate, parseDateInput } from "@/components/dates";
@@ -129,11 +130,7 @@ function TransactionsContent() {
   }, [tenantId, currentYear, supportingDocumentsOf]);
 
   if (!currentYear) {
-    return (
-      <Text fontSize="sm" color="fg.muted" p={6}>
-        会計年度がまだありません。「会計年度」から年度を作成してください。
-      </Text>
-    );
+    return <FiscalYearRequired p={6} />;
   }
 
   const yearMin = formatDate(currentYear.startDate);

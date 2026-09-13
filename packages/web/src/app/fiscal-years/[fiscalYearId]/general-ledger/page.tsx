@@ -24,6 +24,7 @@ import {
 } from "@account-ledgers/usecases";
 import { AccountTitleBadge } from "@/components/AccountTitleBadge";
 import { AppShell } from "@/components/AppShell";
+import { FiscalYearRequired } from "@/components/FiscalYearRequired";
 import { MonetaryAmountText } from "@/components/MonetaryAmountText";
 import { TableCard } from "@/components/TableCard";
 import { formatDateInFiscalYear } from "@/components/dates";
@@ -116,11 +117,7 @@ function GeneralLedgerContent() {
   }
 
   if (!currentYear) {
-    return (
-      <Text fontSize="sm" color="fg.muted">
-        会計年度がまだありません。「会計年度」から年度を作成してください。
-      </Text>
-    );
+    return <FiscalYearRequired />;
   }
 
   const balanceSideLabel = accountTitle

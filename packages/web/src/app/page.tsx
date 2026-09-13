@@ -6,6 +6,7 @@ import NextLink from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { FiscalYearRequired } from "@/components/FiscalYearRequired";
 import { JournalSupportingDocumentsDialog } from "@/components/JournalSupportingDocumentsDialog";
 import { JournalTable } from "@/components/JournalTable";
 import { useAccountTitles } from "@/hooks/useAccountTitles";
@@ -87,11 +88,7 @@ function RecentTransactions() {
   }, [tenantId, currentYear, supportingDocumentsOf]);
 
   if (!currentYear) {
-    return (
-      <Text fontSize="sm" color="fg.muted">
-        会計年度がまだありません。「会計年度」から年度を作成してください。
-      </Text>
-    );
+    return <FiscalYearRequired />;
   }
 
   return (
