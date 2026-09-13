@@ -88,10 +88,22 @@ function pageMeta(pathname: string, subtitleForScoped: string): {
   return { title: "ホーム", subtitle: "オープンソースの帳簿管理" };
 }
 
+/** Height of the sticky page header; content that sticks below it starts at this offset. */
+export const APP_SHELL_HEADER_HEIGHT = "56px";
+
+export interface AppShellProps {
+  children: React.ReactNode;
+  /**
+   * Lay the content out edge to edge, without the usual padding, for a page
+   * whose table should stretch across the whole content column.
+   */
+  flush?: boolean;
+}
+
 /**
  * Shared shell for pages that require authentication. Redirects to /login when signed out.
  */
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children, flush = false }: AppShellProps) {
   const { user, loading } = useAuth();
   const router = useRouter();
 
@@ -111,12 +123,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <FiscalYearProvider>
-      <AppShellInner>{children}</AppShellInner>
+      <AppShellInner flush={flush}>{children}</AppShellInner>
     </FiscalYearProvider>
   );
 }
 
-function AppShellInner({ children }: { children: React.ReactNode }) {
+function AppShellInner({ children, flush }: Required<AppShellProps>) {
   const { user } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -271,7 +283,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
           align="center"
           gap={4}
           px={6}
-          h="56px"
+          h={APP_SHELL_HEADER_HEIGHT}
           flexShrink={0}
           bg="bg.panel"
           borderBottomWidth="1px"
@@ -356,7 +368,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
           </HStack>
         </Flex>
 
-        <Box flex={1} p={6} minW={0}>
+        <Box flex={1} p={flush ? 0 : 6} minW={0}>
           {children}
         </Box>
       </Flex>

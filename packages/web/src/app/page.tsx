@@ -1,30 +1,18 @@
 "use client";
 
-import {
-  type AccountTitle,
-  calcPostingTotals,
-  type PostingSide,
-  type Transaction,
-} from "@account-ledgers/domain";
-import {
-  Badge,
-  Box,
-  Flex,
-  HStack,
-  Link,
-  Spinner,
-  Table,
-  Text,
-} from "@chakra-ui/react";
+import { type Transaction, type UserId } from "@account-ledgers/domain";
+import { Box, Flex, Link, Spinner, Text } from "@chakra-ui/react";
 import NextLink from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AccountTitleBadge } from "@/components/AccountTitleBadge";
 import { AppShell } from "@/components/AppShell";
-import { MonetaryAmountText } from "@/components/MonetaryAmountText";
-import { formatDateInFiscalYear } from "@/components/dates";
+import { JournalSupportingDocumentsDialog } from "@/components/JournalSupportingDocumentsDialog";
+import { JournalTable } from "@/components/JournalTable";
 import { useAccountTitles } from "@/hooks/useAccountTitles";
 import { useAuth } from "@/hooks/useAuth";
 import { useFiscalYears } from "@/hooks/useFiscalYears";
+import { usePartners } from "@/hooks/usePartners";
+import { useTags } from "@/hooks/useTags";
 import { usecases } from "@account-ledgers/infrastructure/container";
 
 const RECENT_LIMIT = 8;
@@ -37,17 +25,31 @@ export default function HomePage() {
   );
 }
 
+/** The newest journal rows, shown exactly as the journal shows them. */
 function RecentTransactions() {
-  const { tenantId } = useAuth();
+  const { tenantId, user } = useAuth();
   const { currentYear } = useFiscalYears();
   const { accountTitles } = useAccountTitles();
+  const { partners } = usePartners();
+  const { tags } = useTags();
+  const router = useRouter();
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  // The transaction whose supporting documents are open in the dialog.
+  const [supportingDocumentsOf, setSupportingDocumentsOf] = useState<Transaction | null>(null);
 
-  const accountById = useMemo(
+  const accountTitleById = useMemo(
     () => new Map(accountTitles.map((a) => [a.id, a])),
     [accountTitles],
+  );
+  const partnerNameById = useMemo(
+    () => new Map(partners.map((p) => [p.id, p.name])),
+    [partners],
+  );
+  const tagNameById = useMemo(
+    () => new Map(tags.map((t) => [t.id, t.name])),
+    [tags],
   );
 
   const load = useCallback(async () => {
@@ -71,6 +73,18 @@ function RecentTransactions() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // After the dialog attaches or detaches, refresh the header the indicator reads.
+  const refreshTransaction = useCallback(async () => {
+    if (!tenantId || !currentYear || !supportingDocumentsOf) return;
+    const fresh = await usecases.transactions.get({
+      tenantId,
+      yearId: currentYear.id,
+      transactionId: supportingDocumentsOf.id,
+    });
+    if (!fresh) return;
+    setTransactions((prev) => prev.map((t) => (t.id === fresh.id ? fresh : t)));
+  }, [tenantId, currentYear, supportingDocumentsOf]);
 
   if (!currentYear) {
     return (
@@ -110,96 +124,32 @@ function RecentTransactions() {
           </Text>
         </Box>
       ) : (
-        <Table.Root size="md" variant="outline" borderWidth={0}>
-          <Table.Header>
-            <Table.Row bg="bg.subtle">
-              <Table.ColumnHeader w="7rem">日付</Table.ColumnHeader>
-              <Table.ColumnHeader>摘要</Table.ColumnHeader>
-              <Table.ColumnHeader w="11rem">借方科目</Table.ColumnHeader>
-              <Table.ColumnHeader w="11rem">貸方科目</Table.ColumnHeader>
-              <Table.ColumnHeader w="9rem" textAlign="right">
-                金額(円)
-              </Table.ColumnHeader>
-              <Table.ColumnHeader w="6rem">状態</Table.ColumnHeader>
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {transactions.map((transaction) => (
-              <Table.Row key={transaction.id}>
-                <Table.Cell color="fg.muted" fontFamily="mono">
-                  {formatDateInFiscalYear(
-                    transaction.date,
-                    currentYear,
-                  )}
-                </Table.Cell>
-                <Table.Cell>{transaction.description}</Table.Cell>
-                <Table.Cell>
-                  <SideBadges
-                    transaction={transaction}
-                    side="debit"
-                    accountById={accountById}
-                  />
-                </Table.Cell>
-                <Table.Cell>
-                  <SideBadges
-                    transaction={transaction}
-                    side="credit"
-                    accountById={accountById}
-                  />
-                </Table.Cell>
-                <Table.Cell textAlign="right" fontFamily="mono">
-                  <MonetaryAmountText
-                    value={
-                      calcPostingTotals(transaction.postings)
-                        .debitTotal
-                    }
-                  />
-                </Table.Cell>
-                <Table.Cell>
-                  {transaction.deleted ? (
-                    <Badge colorPalette="red">削除済</Badge>
-                  ) : (
-                    <Badge colorPalette="green">有効</Badge>
-                  )}
-                </Table.Cell>
-              </Table.Row>
-            ))}
-          </Table.Body>
-        </Table.Root>
+        <JournalTable
+          transactions={transactions}
+          fiscalYear={currentYear}
+          accountTitleById={accountTitleById}
+          partnerNameById={partnerNameById}
+          tagNameById={tagNameById}
+          onOpen={(transaction) =>
+            router.push(
+              `/fiscal-years/${currentYear.id}/transactions/${transaction.id}/edit/`,
+            )
+          }
+          onOpenSupportingDocuments={setSupportingDocumentsOf}
+        />
+      )}
+
+      {supportingDocumentsOf && tenantId && user && (
+        <JournalSupportingDocumentsDialog
+          tenantId={tenantId}
+          yearId={currentYear.id}
+          userId={user.uid as UserId}
+          transaction={supportingDocumentsOf}
+          disabled={currentYear.status !== "open" || supportingDocumentsOf.deleted}
+          onChanged={() => void refreshTransaction()}
+          onClose={() => setSupportingDocumentsOf(null)}
+        />
       )}
     </Box>
-  );
-}
-
-/** The distinct account titles on one side of a transaction, as colored badges. */
-function SideBadges({
-  transaction,
-  side,
-  accountById,
-}: {
-  transaction: Transaction;
-  side: PostingSide;
-  accountById: Map<string, AccountTitle>;
-}) {
-  const seen = new Set<string>();
-  const accounts: AccountTitle[] = [];
-  for (const posting of transaction.postings) {
-    if (posting.side !== side) continue;
-    const account = accountById.get(posting.accountTitleId);
-    if (account && !seen.has(account.id)) {
-      seen.add(account.id);
-      accounts.push(account);
-    }
-  }
-  return (
-    <HStack gap={1} flexWrap="wrap">
-      {accounts.map((account) => (
-        <AccountTitleBadge
-          key={account.id}
-          name={account.name}
-          category={account.category}
-        />
-      ))}
-    </HStack>
   );
 }
